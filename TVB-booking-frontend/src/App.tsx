@@ -1,9 +1,9 @@
-import { Container, Row } from 'react-bootstrap'
+
 import './App.scss'
 function App() {
   return (
     <>
-      <Container className="text-center">
+      <div className="Container text-center">
         <form action='submit'>
           <div className='row justify-content-center'>
             <div className='col-sm-4'>
@@ -55,8 +55,7 @@ function App() {
             <div className='col-sm-4'></div>
           </div>
         </form>
-      </Container>
-      <Row></Row>
+      </div>
     </>
   )
 }
