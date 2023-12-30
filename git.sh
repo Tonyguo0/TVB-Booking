@@ -1,1 +1,1 @@
-git add . && git commit -am "added backend" && git push
+git add . && git commit -am "slight adjustment to backend" && git push
