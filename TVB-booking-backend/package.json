@@ -6,7 +6,10 @@
     "dev": "bun run --hot --watch src/index.ts"
   },
   "dependencies": {
-    "elysia": "latest"
+    "@elysiajs/cors": "^0.8.0",
+    "@types/node": "^20.10.6",
+    "elysia": "latest",
+    "googleapis": "^129.0.0"
   },
   "devDependencies": {
     "bun-types": "latest"
