@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { testAddSheet } from "./sheet";
+import { IPlayer } from "./model/player";
 
 const app = new Elysia()
     .use(
@@ -14,9 +15,9 @@ const app = new Elysia()
     )
     .get("/", () => "Hello Elysia!!!")
     .get("/hello", () => "Hello World!")
-    .post("/player", ({ headers, body }) => {
-        testAddSheet();
-        console.log(headers, body);
+    .post("/player", ({ body }: { body: IPlayer }) => {
+        testAddSheet([body.first_name, body.last_name, body.email, body.phone_no]);
+        console.log(body);
     })
     .listen(3000);
 

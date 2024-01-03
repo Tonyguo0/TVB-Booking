@@ -1,9 +1,9 @@
 import { google } from "googleapis";
+import path from "path";
 
-export const testAddSheet = async () => {
-    const auth = new google.auth.JWT({
-        email: `tonyguo998@studied-airline-234911.iam.gserviceaccount.com`,
-        key: Bun.env.google_service_account_key,
+export const testAddSheet = async (response: Array<string>) => {
+    const auth = new google.auth.GoogleAuth({
+        keyFile: path.join(import.meta.dir, `../`, `google-cred.json`),
         scopes: ["https://www.googleapis.com/auth/spreadsheets"]
     });
     const sheet = google.sheets("v4");
@@ -13,7 +13,7 @@ export const testAddSheet = async () => {
         range: "Sheet1",
         valueInputOption: "RAW",
         requestBody: {
-            values: [["hello", "world"]]
+            values: [[...response]]
         }
     });
 };
