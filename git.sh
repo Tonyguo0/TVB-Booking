@@ -1,1 +1,1 @@
-git add . && git commit -am "added functionality to frontend to update player object with UseState" && git push
+git add . && git commit -am "refactored player.ts model and service in frontend, added .prettierrc, deleted vite.svg, added some simple backend functionality " && git push
