@@ -2,10 +2,14 @@ import React, { useState } from "react";
 import "./App.scss";
 import { emptyPlayer } from "./model/player";
 import create from "./services/player";
-import { SquarePaymentsForm } from "react-square-web-payments-sdk";
+import { CreditCard, PaymentForm } from "react-square-web-payments-sdk";
+import useScript from "./services/useScript";
 
 const App = () => {
+    const SQUARE_APPLICATION_ID: string = import.meta.env.VITE_SQ_APPLICATION_ID;
+    const SQUARE_LOCATION_ID: string = import.meta.env.VITE_SQ_LOCATION_ID;
     const [player, setPlayer] = useState(emptyPlayer);
+    useScript("https://sandbox.web.squarecdn.com/v1/square.js");
 
     const addPlayer = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -21,7 +25,7 @@ const App = () => {
             [id]: value
         }));
     };
-
+    // console.log("application ID", process.env.SQ_APPLICATION_ID)
     return (
         <>
             <div className="Container text-center">
@@ -64,7 +68,46 @@ const App = () => {
                 </form>
             </div>
 
-            <SquarePaymentsForm></SquarePaymentsForm>
+            <PaymentForm
+                /**
+                 * Identifies the calling form with a verified application ID generated from
+                 * the Square Application Dashboard.
+                 */
+                applicationId={SQUARE_APPLICATION_ID}
+                /**
+                 * Invoked when payment form receives the result of a tokenize generation
+                 * request. The result will be a valid credit card or wallet token, or an error.
+                 */
+                cardTokenizeResponseReceived={(token, buyer) => {
+                    console.info({ token, buyer });
+                }}
+                /**
+                 * This function enable the Strong Customer Authentication (SCA) flow
+                 *
+                 * We strongly recommend use this function to verify the buyer and reduce
+                 * the chance of fraudulent transactions.
+                 */
+                createVerificationDetails={() => ({
+                    amount: "1.00",
+                    /* collected from the buyer */
+                    billingContact: {
+                        addressLines: ["123 Main Street", "Apartment 1"],
+                        familyName: "Doe",
+                        givenName: "John",
+                        countryCode: "GB",
+                        city: "London"
+                    },
+                    currencyCode: "GBP",
+                    intent: "CHARGE"
+                })}
+                /**
+                 * Identifies the location of the merchant that is taking the payment.
+                 * Obtained from the Square Application Dashboard - Locations tab.
+                 */
+                locationId={SQUARE_LOCATION_ID}
+            >
+                <CreditCard />
+            </PaymentForm>
         </>
     );
 };
