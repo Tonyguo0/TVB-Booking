@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import "./App.scss";
 import { emptyPlayer } from "./model/player";
 import create from "./services/player";
+import { SquarePaymentsForm } from "react-square-web-payments-sdk";
 
 const App = () => {
     const [player, setPlayer] = useState(emptyPlayer);
@@ -62,6 +63,8 @@ const App = () => {
                     </div>
                 </form>
             </div>
+
+            <SquarePaymentsForm></SquarePaymentsForm>
         </>
     );
 };

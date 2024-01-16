@@ -1,1 +1,1 @@
-git add . && git commit -am "added square, quickstart for square test file" && git push
+git add . && git commit -am "added react square payment sdk to frontend" && git push
