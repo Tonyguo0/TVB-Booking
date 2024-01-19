@@ -2,12 +2,14 @@ import React, { useState } from "react";
 import "./App.scss";
 import { emptyPlayer } from "./model/player";
 import create from "./services/player";
-import { CreditCard, PaymentForm } from "react-square-web-payments-sdk";
+import { CreditCard, PaymentForm, Divider, GiftCard, GooglePay, Afterpay} from "react-square-web-payments-sdk";
 import useScript from "./services/useScript";
+import cardPayment from "./card";
+import { payments } from "@square/web-sdk";
 
 const App = () => {
-    const SQUARE_APPLICATION_ID: string = import.meta.env.VITE_SQ_APPLICATION_ID;
-    const SQUARE_LOCATION_ID: string = import.meta.env.VITE_SQ_LOCATION_ID;
+    const SQUARE_APPLICATION_ID: string = import.meta.env.VITE_SB_SQ_APPLICATION_ID;
+    const SQUARE_LOCATION_ID: string = import.meta.env.VITE_SB_SQ_LOCATION_ID;
     const [player, setPlayer] = useState(emptyPlayer);
     useScript("https://sandbox.web.squarecdn.com/v1/square.js");
 
@@ -81,32 +83,54 @@ const App = () => {
                 cardTokenizeResponseReceived={(token, buyer) => {
                     console.info({ token, buyer });
                 }}
+                createPaymentRequest={()=>{
+                    return {
+                        countryCode: 'AU',
+                        currencyCode: 'AUD',
+                        total: {
+                          amount: '1.00',
+                          label: 'Total',
+                        },
+                      };
+                }}
                 /**
                  * This function enable the Strong Customer Authentication (SCA) flow
                  *
                  * We strongly recommend use this function to verify the buyer and reduce
                  * the chance of fraudulent transactions.
                  */
-                createVerificationDetails={() => ({
-                    amount: "1.00",
-                    /* collected from the buyer */
-                    billingContact: {
-                        addressLines: ["123 Main Street", "Apartment 1"],
-                        familyName: "Doe",
-                        givenName: "John",
-                        countryCode: "GB",
-                        city: "London"
-                    },
-                    currencyCode: "GBP",
-                    intent: "CHARGE"
-                })}
+                // createVerificationDetails={() => ({
+                //     amount: "1.00",
+                //     /* collected from the buyer */
+                //     billingContact: {
+                //         addressLines: ["123 Main Street", "Apartment 1"],
+                //         familyName: "Doe",
+                //         givenName: "John",
+                //         countryCode: "GB",
+                //         city: "London"
+                //     },
+                //     currencyCode: "GBP",
+                //     intent: "CHARGE"
+                // })}
                 /**
                  * Identifies the location of the merchant that is taking the payment.
                  * Obtained from the Square Application Dashboard - Locations tab.
                  */
                 locationId={SQUARE_LOCATION_ID}
             >
-                <CreditCard />
+                <label htmlFor="voucher">Voucher:</label>
+                <input id="voucher" type="text" />
+                <CreditCard
+                    includeInputLabels
+                    postalCode="12345"
+                />
+                
+                <Divider/>
+                <GooglePay/>
+                <Divider/>
+                <Afterpay/>
+               
+
             </PaymentForm>
         </>
     );
