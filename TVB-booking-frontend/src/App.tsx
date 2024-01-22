@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import "./App.scss";
 import { emptyPlayer } from "./model/player";
 import create from "./services/player";
-import { CreditCard, PaymentForm, Divider, GiftCard, GooglePay, Afterpay} from "react-square-web-payments-sdk";
+import { CreditCard, PaymentForm, Divider, GiftCard, GooglePay, Afterpay } from "react-square-web-payments-sdk";
 import useScript from "./services/useScript";
 import cardPayment from "./card";
 import { payments } from "@square/web-sdk";
+import createPay from "./services/pay";
 
 const App = () => {
     const SQUARE_APPLICATION_ID: string = import.meta.env.VITE_SB_SQ_APPLICATION_ID;
@@ -76,22 +77,24 @@ const App = () => {
                  * the Square Application Dashboard.
                  */
                 applicationId={SQUARE_APPLICATION_ID}
+                locationId={SQUARE_LOCATION_ID}
                 /**
                  * Invoked when payment form receives the result of a tokenize generation
                  * request. The result will be a valid credit card or wallet token, or an error.
                  */
                 cardTokenizeResponseReceived={(token, buyer) => {
                     console.info({ token, buyer });
+                    createPay(token);
                 }}
-                createPaymentRequest={()=>{
+                createPaymentRequest={() => {
                     return {
-                        countryCode: 'AU',
-                        currencyCode: 'AUD',
+                        countryCode: "AU",
+                        currencyCode: "AUD",
                         total: {
-                          amount: '1.00',
-                          label: 'Total',
-                        },
-                      };
+                            amount: "1.00",
+                            label: "Total"
+                        }
+                    };
                 }}
                 /**
                  * This function enable the Strong Customer Authentication (SCA) flow
@@ -116,21 +119,16 @@ const App = () => {
                  * Identifies the location of the merchant that is taking the payment.
                  * Obtained from the Square Application Dashboard - Locations tab.
                  */
-                locationId={SQUARE_LOCATION_ID}
+                
             >
                 <label htmlFor="voucher">Voucher:</label>
                 <input id="voucher" type="text" />
-                <CreditCard
-                    includeInputLabels
-                    postalCode="12345"
-                />
-                
-                <Divider/>
-                <GooglePay/>
-                <Divider/>
-                <Afterpay/>
-               
+                <CreditCard includeInputLabels postalCode="12345" />
 
+                <Divider />
+                <GooglePay />
+                <Divider />
+                <Afterpay />
             </PaymentForm>
         </>
     );

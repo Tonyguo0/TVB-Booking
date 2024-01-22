@@ -2,7 +2,8 @@ import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { testAddSheet } from "./sheet";
 import { IPlayer } from "./model/player";
-const app = new Elysia();
+import { payController } from "./pay";
+const app = new Elysia({ prefix: `/api` });
 
 app.use(
     cors({
@@ -12,7 +13,7 @@ app.use(
         methods: [`GET`, `PUT`, `POST`, `DELETE`],
         preflight: true
     })
-);
+).use(payController);
 
 app.get("/", () => "Hello Elysia!!!");
 

@@ -1,9 +1,11 @@
 {
   "name": "TVB-booking-backend",
   "version": "1.0.50",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --hot --watch src/index.ts",
+    "dev:bun": "bun run --hot --watch src/index.ts",
+    "dev:node": "node --loader ts-node/esm src/index.ts",
     "quick": "node src/quickstart.ts"
   },
   "dependencies": {
@@ -11,10 +13,12 @@
     "@types/node": "^20.10.6",
     "elysia": "latest",
     "googleapis": "^129.0.0",
-    "square": "^33.1.0"
+    "square": "^33.1.0",
+    "ts-node": "^10.9.2"
   },
   "devDependencies": {
-    "bun-types": "latest"
+    "bun-types": "latest",
+    "tsconfig-paths": "^4.2.0"
   },
-  "module": "src/index.js"
+  "module": "src/index.ts"
 }

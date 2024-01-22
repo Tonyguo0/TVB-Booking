@@ -5,6 +5,10 @@ export type IPlayer = {
     phone_no: string;
 };
 
+export type ICreatePay = {
+    sourceId: string;
+};
+
 export const emptyPlayer: IPlayer = {
     first_name: "",
     last_name: "",
