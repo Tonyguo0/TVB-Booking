@@ -1,7 +1,5 @@
-import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
-import { testAddSheet } from "./sheet";
-import { IPlayer } from "./model/player";
+import { Elysia } from "elysia";
 import { payController } from "./pay";
 const app = new Elysia({ prefix: `/api` });
 
@@ -18,11 +16,6 @@ app.use(
 app.get("/", () => "Hello Elysia!!!");
 
 app.get("/hello", () => "Hello World!");
-
-app.post("/player", ({ body }: { body: IPlayer }) => {
-    testAddSheet([body.first_name, body.last_name, body.email, body.phone_no]);
-    console.log(body);
-});
 
 app.listen(3000, () => {
     console.log(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);

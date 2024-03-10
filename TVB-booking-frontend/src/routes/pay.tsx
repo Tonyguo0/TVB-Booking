@@ -1,9 +1,19 @@
-import { CreditCard, PaymentForm, Divider, GooglePay, Afterpay } from "react-square-web-payments-sdk";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Afterpay, CreditCard, Divider, GooglePay, PaymentForm } from "react-square-web-payments-sdk";
+import { IPlayer, emptyPlayer } from "../model/player";
 import createPay from "../services/pay";
 
 const Pay = () => {
+    const { state } = useLocation();
+    let player: IPlayer = emptyPlayer;
+
     const SQUARE_APPLICATION_ID: string = import.meta.env.VITE_SB_SQ_APPLICATION_ID;
     const SQUARE_LOCATION_ID: string = import.meta.env.VITE_SB_SQ_LOCATION_ID;
+    const navigate = useNavigate();
+    if (state.player != null) {
+        player = state.player;
+        console.log(player);
+    }
     return (
         <>
             <PaymentForm
@@ -17,9 +27,18 @@ const Pay = () => {
                  * Invoked when payment form receives the result of a tokenize generation
                  * request. The result will be a valid credit card or wallet token, or an error.
                  */
-                cardTokenizeResponseReceived={(token, buyer) => {
+                cardTokenizeResponseReceived={async (token, buyer) => {
                     console.info({ token, buyer });
-                    createPay(token);
+                    try {
+                        const response = await createPay(player, token);
+                        if (response?.result?.payment.status === `COMPLETED`) {
+                            alert(`payment successful`);
+                            navigate(`/`, {});
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        alert(`payment unsuccessful`);
+                    }
                 }}
                 createPaymentRequest={() => {
                     return {
@@ -57,7 +76,7 @@ const Pay = () => {
             >
                 <label htmlFor="voucher">Voucher:</label>
                 <input id="voucher" type="text" />
-                <CreditCard includeInputLabels postalCode="12345" />
+                <CreditCard includeInputLabels postalCode="12345" callbacks />
 
                 <Divider />
                 <GooglePay />

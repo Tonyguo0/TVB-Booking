@@ -1,1 +1,2 @@
-git add . && git commit -am "added routing for react, react-router-dom, sort-by, local forage, match-sorter" && git push
+git add . && git commit -am "changed main router provider to app.tsx instead, using useNavigate and useLocation from reactRouter to pass player state from one route to another. removed /api/player endpoint for both front services and back end and added in functionality for api/createPay, payController endpoint to add to goole sheet instead when payment is successful and add a new paid column and append yes to the corresponding player whom have paid. deleted bigint ToJSON temp solution with the entire util folder as Do not know how to serialize a BigInt
+        at JSON.stringify bug is fixed in the googlechromelabs repo. " && git push
