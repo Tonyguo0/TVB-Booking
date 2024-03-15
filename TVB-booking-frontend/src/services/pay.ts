@@ -17,4 +17,16 @@ const createPay = async (newPlayer: IPlayer, token) => {
     }
 };
 
-export default createPay;
+const createPayLink = async (newPlayer: IPlayer) => {
+    try {
+        const body: { player: IPlayer } = {
+            player: newPlayer
+        };
+        const response = await axios.post(`${baseUrl}/createPayLink`, body);
+        return response.data;
+    } catch (err) {
+        console.log(err);
+    }
+};
+
+export default { createPay, createPayLink };
