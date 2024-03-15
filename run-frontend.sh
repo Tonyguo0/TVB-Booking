@@ -1,0 +1,1 @@
+cd TVB-booking-frontend/ && bun run dev:bun
