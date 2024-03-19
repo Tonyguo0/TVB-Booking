@@ -2,7 +2,11 @@
   "name": "tvb-booking",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
+  "exports": {
+    ".":{
+      "types": "./node_modules/react-square-web-payments-sdk/dist/index.d.ts"
+    }
+  },
   "scripts": {
     "start": "vite",
     "dev:bun": "bunx --bun vite",

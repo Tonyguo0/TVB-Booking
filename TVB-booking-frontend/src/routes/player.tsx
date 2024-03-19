@@ -1,25 +1,19 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { emptyPlayer } from "../model/player";
-import createPay from "../services/pay";
-import useScript from "../services/useScript";
 
 const Player = () => {
     const [player, setPlayer] = useState(emptyPlayer);
 
-    // const navigate = useNavigate();
-    useScript("https://sandbox.web.squarecdn.com/v1/square.js");
+    const navigate = useNavigate();
+    // useScript("https://sandbox.web.squarecdn.com/v1/square.js");
 
     const addPlayer = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         console.log("Pay submitted", event.target);
-        // create(player);
         console.log(player);
-        const url: string = await createPay.createPayLink(player);
-        console.log(url);
         setPlayer(emptyPlayer);
-        // navigate(`/payment`, { state: { player } });
-        window.location.href = url;
+        navigate(`/payment`, { state: { player } });
     };
 
     const handlePlayerChange = (event: React.ChangeEvent<HTMLInputElement>) => {

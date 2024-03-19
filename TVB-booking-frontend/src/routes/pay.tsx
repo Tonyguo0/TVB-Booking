@@ -1,7 +1,8 @@
 import { useLocation, useNavigate } from "react-router-dom";
+// TODO: do something about this erro
 import { Afterpay, CreditCard, Divider, GooglePay, PaymentForm } from "react-square-web-payments-sdk";
 import { IPlayer, emptyPlayer } from "../model/player";
-import createPay from "../services/pay";
+import payService from "../services/pay";
 
 const Pay = () => {
     const { state } = useLocation();
@@ -30,10 +31,15 @@ const Pay = () => {
                 cardTokenizeResponseReceived={async (token, buyer) => {
                     console.info({ token, buyer });
                     try {
-                        const response = await createPay(player, token);
+                        const response = await payService.createPay(player, token);
+                        console.log(response);
+                        if (response === false) {
+                            alert(`player has already registered in TVB!`);
+                            navigate(`/`);
+                        }
                         if (response?.result?.payment.status === `COMPLETED`) {
                             alert(`payment successful`);
-                            navigate(`/`, {});
+                            navigate(`/`);
                         }
                     } catch (err) {
                         console.error(err);
@@ -74,14 +80,14 @@ const Pay = () => {
                  * Obtained from the Square Application Dashboard - Locations tab.
                  */
             >
-                <label htmlFor="voucher">Voucher:</label>
-                <input id="voucher" type="text" />
                 <CreditCard includeInputLabels postalCode="12345" callbacks />
 
                 <Divider />
                 <GooglePay />
                 <Divider />
                 <Afterpay />
+                <label htmlFor="voucher">Voucher:</label>
+                <input id="voucher" type="text" />
             </PaymentForm>
         </>
     );

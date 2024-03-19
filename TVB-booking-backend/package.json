@@ -13,10 +13,12 @@
     "@types/node": "^20.10.6",
     "elysia": "latest",
     "googleapis": "^129.0.0",
+    "lodash": "^4.17.21",
     "square": "^33.1.0",
     "ts-node": "^10.9.2"
   },
   "devDependencies": {
+    "@types/lodash": "^4.17.0",
     "bun-types": "latest",
     "tsconfig-paths": "^4.2.0"
   },

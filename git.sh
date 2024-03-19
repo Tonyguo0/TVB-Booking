@@ -1,1 +1,1 @@
-git add . && git commit -am "tried out create payment link, can now click pay and navigate to payment link" && git push
+git add . && git commit -am "got rid of creatpaymentlink api calls/solutions (webhook too expensive), made a checker for player that has registered already" && git push
