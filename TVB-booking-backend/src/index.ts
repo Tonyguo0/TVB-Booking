@@ -1,6 +1,8 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
 import { payController } from "./pay";
+import { getSheetTitle } from "./sheet";
+import { getThisWeekSunday } from "./utils/utils";
 const app = new Elysia({ prefix: `/api` });
 
 app.use(
@@ -16,6 +18,18 @@ app.use(
 app.get("/", () => "Hello Elysia!!!");
 
 app.get("/hello", () => "Hello World!");
+
+app.get("/test", async () => {
+    const latestsheet = await getSheetTitle();
+    const thisSunday = getThisWeekSunday();
+    if (latestsheet === thisSunday) {
+        console.log("cool!");
+    } else {
+        // TODO: this
+        console.log(`add a new sheet called ${thisSunday}`);
+    }
+    // checkIfSundayExists(latestsheet);
+});
 
 app.listen(3000, () => {
     console.log(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);

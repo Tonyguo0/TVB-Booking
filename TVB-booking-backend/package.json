@@ -3,9 +3,10 @@
   "version": "1.0.50",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "testhelloworld": "echo \"Error: no test specified\" && exit 1",
     "dev:bun": "bun run --hot --watch src/index.ts",
     "dev:node": "node --loader ts-node/esm src/index.ts",
+    "test": "tsc src/test.ts && node src/test.js",
     "quick": "node src/quickstart.ts"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@types/lodash": "^4.17.0",
     "bun-types": "latest",
+    "node-typescript": "^0.1.3",
     "tsconfig-paths": "^4.2.0"
   },
   "module": "src/index.ts"

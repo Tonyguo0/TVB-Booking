@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreatePaymentLinkResponse, CreatePaymentResponse, Environment } from "square";
 import { addSheet, sheetContainsPlayer } from "./sheet";
-import utils from "./utils";
+import bigint from "./bigint";
 
 const { paymentsApi, checkoutApi, ordersApi } = new Client({
     accessToken: process.env.SQUARE_ACCESS_TOKEN,

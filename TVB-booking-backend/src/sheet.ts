@@ -1,7 +1,7 @@
 import { google } from "googleapis";
+import _ from "lodash";
 import path from "path";
 import { IPlayer } from "./model/player";
-import _ from "lodash";
 
 const auth = new google.auth.GoogleAuth({
     keyFile: path.join(import.meta.dir, `../`, `google-cred.json`),
@@ -47,3 +47,29 @@ export const sheetContainsPlayer = async (player: IPlayer): Promise<boolean> => 
         return false;
     }
 };
+
+export const getSheetTitle = async (): Promise<string> => {
+    try {
+        const spreadSheetResponse = await sheet.spreadsheets.get({
+            spreadsheetId: process.env.spread_sheet_id,
+            auth: auth
+        });
+        const sheets = spreadSheetResponse.data.sheets;
+        if (sheets == null) {
+            console.error(`could not get sheet data from google API spreadsheets`);
+            throw new Error(`could not get sheet data from google API spreadsheets`);
+        }
+        const latestSheet: string = sheets?.[sheets?.length - 1].properties?.title!;
+        console.log(sheets);
+        console.log(`latest sheet is: ${latestSheet}`);
+        return latestSheet;
+    } catch (error: Error | any) {
+        console.error(error);
+        throw error;
+    }
+};
+
+export const checkIfSundayExists = async (latestSheet: string) => {
+
+};
+
