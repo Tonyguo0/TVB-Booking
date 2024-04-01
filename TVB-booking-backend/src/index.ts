@@ -1,7 +1,7 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
-import { payController } from "./pay";
-import { getSheetTitle } from "./sheet";
+import { addNonDuplicateCustomer, payController } from "./pay";
+import { addSheets, getSheetTitle } from "./sheet";
 import { getThisWeekSunday } from "./utils/utils";
 const app = new Elysia({ prefix: `/api` });
 
@@ -20,15 +20,13 @@ app.get("/", () => "Hello Elysia!!!");
 app.get("/hello", () => "Hello World!");
 
 app.get("/test", async () => {
-    const latestsheet = await getSheetTitle();
-    const thisSunday = getThisWeekSunday();
-    if (latestsheet === thisSunday) {
-        console.log("cool!");
-    } else {
-        // TODO: this
-        console.log(`add a new sheet called ${thisSunday}`);
-    }
-    // checkIfSundayExists(latestsheet);
+    console.log(`test`);
+    await addNonDuplicateCustomer({
+        first_name: "testfn",
+        last_name: "testln",
+        email: "testemail@gmail.com",
+        phone_no: "0438982888"
+    });
 });
 
 app.listen(3000, () => {

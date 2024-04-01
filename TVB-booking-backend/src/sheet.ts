@@ -2,6 +2,7 @@ import { google } from "googleapis";
 import _ from "lodash";
 import path from "path";
 import { IPlayer } from "./model/player";
+import { getThisWeekSunday } from "./utils/utils";
 
 const auth = new google.auth.GoogleAuth({
     keyFile: path.join(import.meta.dir, `../`, `google-cred.json`),
@@ -9,24 +10,32 @@ const auth = new google.auth.GoogleAuth({
 });
 const sheet = google.sheets("v4");
 
-export const addSheet = async (response: Array<string>) => {
+/**
+ * Appends a row to the specified sheet in a Google Spreadsheet.
+ * 
+ * @param response - The array of strings representing the row data to be appended.
+ * @param sheetName - The name of the sheet where the row should be appended.
+ * @returns A Promise that resolves when the row is successfully appended.
+ */
+export async function appendRowToSheet(response: Array<string>, sheetName: string) {
     await sheet.spreadsheets.values.append({
         spreadsheetId: process.env.spread_sheet_id,
         auth: auth,
-        range: "Sheet1",
+        range: `${sheetName}`,
         valueInputOption: "RAW",
+
         requestBody: {
             values: [[...response]]
         }
     });
-};
+}
 
-export const sheetContainsPlayer = async (player: IPlayer): Promise<boolean> => {
+export async function sheetContainsPlayer(player: IPlayer, sheetName: string): Promise<boolean> {
     try {
         const response = await sheet.spreadsheets.values.get({
             spreadsheetId: process.env.spread_sheet_id,
             auth: auth,
-            range: "Sheet1!A:C"
+            range: `${sheetName}!A:C`
         });
         console.log(`\nResponse = ${response?.data.values} \n`);
         const rows: Array<Array<string>> = response.data.values!;
@@ -46,9 +55,9 @@ export const sheetContainsPlayer = async (player: IPlayer): Promise<boolean> => 
         console.error(`The API returned an error: ${err.message}`);
         return false;
     }
-};
+}
 
-export const getSheetTitle = async (): Promise<string> => {
+export async function getSheetTitle(): Promise<string> {
     try {
         const spreadSheetResponse = await sheet.spreadsheets.get({
             spreadsheetId: process.env.spread_sheet_id,
@@ -67,9 +76,47 @@ export const getSheetTitle = async (): Promise<string> => {
         console.error(error);
         throw error;
     }
-};
+}
 
-export const checkIfSundayExists = async (latestSheet: string) => {
+export async function checkAndAppendIfSundayExists(): Promise<string> {
+    const latestsheet: string = await getSheetTitle();
+    const thisSunday: string = await getThisWeekSunday();
+    if (latestsheet === thisSunday) {
+        console.log("cool!");
+        return latestsheet;
+    } else {
+        console.log(`adding a new sheet called ${thisSunday}`);
+        await addSheets(thisSunday);
+        //TODO: need to make the responses bold
+        await appendRowToSheet(["First Name", "Last Name", "Email", "Phone Number", "Pay ID", "Paid?"], thisSunday);
+        return thisSunday;
+    }
+}
 
-};
-
+export async function addSheets(sheetTitle: string): Promise<void> {
+    try {
+        const request = {
+            spreadsheetId: process.env.spread_sheet_id,
+            auth: auth,
+            resource: {
+                requests: [
+                    {
+                        addSheet: {
+                            properties: {
+                                title: sheetTitle,
+                                gridProperties: {
+                                    rowCount: 100,
+                                    columnCount: 26
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        };
+        const response = await sheet.spreadsheets.batchUpdate(request);
+        console.log(JSON.stringify(response, null, 2));
+    } catch (error: Error | any) {
+        console.error(error);
+    }
+}

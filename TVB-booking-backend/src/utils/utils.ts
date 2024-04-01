@@ -1,4 +1,4 @@
-export function getThisWeekSunday(): string {
+export async function getThisWeekSunday(): Promise<string> {
     const today = new Date();
     const currentDay = today.getDay(); // 0 (Sunday) to 6 (Saturday)
 

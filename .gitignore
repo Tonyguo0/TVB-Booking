@@ -69,3 +69,9 @@ dist-ssr
 .env
 
 google-cred.json
+
+test.ts
+
+package-lock.json
+
+bun.lockb

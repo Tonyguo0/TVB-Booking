@@ -2,10 +2,10 @@ import axios from "axios";
 import { IPlayer } from "../model/player";
 const baseUrl = "http://localhost:3000/api";
 
-const createPay = async (newPlayer: IPlayer, token: { token: string; }) => {
+const createPay = async (newPlayer: IPlayer, token: string) => {
     try {
         const body = {
-            sourceId: token.token,
+            sourceId: token,
             player: newPlayer
         };
         console.log(JSON.stringify(body, null, 6));
