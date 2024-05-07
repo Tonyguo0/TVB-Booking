@@ -1,8 +1,8 @@
 import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreatePaymentResponse, Environment } from "square";
-import { appendRowToSheet, checkAndAppendIfSundayExists, sheetContainsPlayer } from "./sheet";
 import { IPlayer } from "./model/player";
+import { appendRowToSheet, checkAndAppendIfSundayExists, sheetContainsPlayer } from "./sheet";
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {

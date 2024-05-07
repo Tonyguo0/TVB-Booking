@@ -12,7 +12,7 @@ const sheet = google.sheets("v4");
 
 /**
  * Appends a row to the specified sheet in a Google Spreadsheet.
- * 
+ *
  * @param response - The array of strings representing the row data to be appended.
  * @param sheetName - The name of the sheet where the row should be appended.
  * @returns A Promise that resolves when the row is successfully appended.
@@ -41,6 +41,43 @@ export async function sheetContainsPlayer(player: IPlayer, sheetName: string): P
         const rows: Array<Array<string>> = response.data.values!;
         if (!rows) throw new Error(`Response rows is empty`);
         const playerArray: Array<string> = [player.first_name, player.last_name, player.email];
+        for (const row of rows) {
+            console.log(`row:`);
+            console.log(row);
+            console.log(`playerArray:`);
+            console.log(playerArray);
+            if (_.isEqual(row, playerArray)) {
+                return true;
+            }
+        }
+        return false;
+    } catch (err: Error | any) {
+        console.error(`The API returned an error: ${err.message}`);
+        return false;
+    }
+}
+
+export async function sheetHasTooManyPlayer(player: IPlayer, sheetName: string): Promise<boolean> {
+    try {
+        const response = await sheet.spreadsheets.values.get({
+            spreadsheetId: process.env.spread_sheet_id,
+            auth: auth,
+            range: `${sheetName}!A:C`
+        });
+        console.log(`\nResponse = ${response?.data.values} \n`);
+        const rows: Array<Array<string>> = response.data.values!;
+        if (!rows) throw new Error(`Response rows is empty`);
+        const playerArray: Array<string> = [player.first_name, player.last_name, player.email];
+        if (rows.length == 57) {
+            const title = await getSheetTitle();
+            appendRowToSheet(["waiting list:"], title);
+            appendRowToSheet([" "], title);
+
+        } else if(rows.length > 57) {
+            // TODO: add players to waiting list when there are more than 57 players
+            // TODO: might have to change it to append row to sheets
+
+        }
         for (const row of rows) {
             console.log(`row:`);
             console.log(row);

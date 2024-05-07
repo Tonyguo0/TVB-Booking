@@ -1,8 +1,6 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
 import { addNonDuplicateCustomer, payController } from "./pay";
-import { addSheets, getSheetTitle } from "./sheet";
-import { getThisWeekSunday } from "./utils/utils";
 const app = new Elysia({ prefix: `/api` });
 
 app.use(

@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
-// TODO: do something about this erro
-import { Afterpay, CreditCard, Divider, GooglePay, PaymentForm, BuyerType } from "react-square-web-payments-sdk";
+// TODO: do something about this error
+import { Afterpay, BuyerType, CreditCard, Divider, GooglePay, PaymentForm } from "react-square-web-payments-sdk";
 
 import { IPlayer, emptyPlayer } from "../model/player";
 import payService from "../services/pay";
@@ -30,7 +30,7 @@ const Pay = () => {
                  * request. The result will be a valid credit card or wallet token, or an error.
                  */
 
-                cardTokenizeResponseReceived={async (token: {token: string}, buyer: BuyerType) => {
+                cardTokenizeResponseReceived={async (token: { token: string }, buyer: BuyerType) => {
                     console.info({ token, buyer });
                     try {
                         const response = await payService.createPay(player, token.token);
