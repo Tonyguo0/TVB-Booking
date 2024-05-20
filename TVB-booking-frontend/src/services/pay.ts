@@ -29,4 +29,16 @@ const createPayLink = async (newPlayer: IPlayer) => {
     }
 };
 
-export default { createPay, createPayLink };
+// TODO: WIP
+const refundPayment = async (playerToRefund: IPlayer) => {
+    try {
+        const body: { player: IPlayer } = { player: playerToRefund}
+        const response = await axios.post(`${baseUrl}/refundPayment`, body);
+        return response.data;
+    } catch (err) {
+        console.log(err);
+    }
+
+}
+
+export default { createPay, createPayLink, refundPayment };

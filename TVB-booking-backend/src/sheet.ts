@@ -57,6 +57,34 @@ export async function sheetContainsPlayer(player: IPlayer, sheetName: string): P
     }
 }
 
+export async function getPaymentId(player: IPlayer, sheetName: string): Promise<string> {
+    try {
+        const response = await sheet.spreadsheets.values.get({
+            spreadsheetId: process.env.spread_sheet_id,
+            auth: auth,
+            range: `${sheetName}!A:C`
+        });
+        console.log(`\nResponse = ${response?.data.values} \n`);
+        const rows: Array<Array<string>> = response.data.values!;
+        if (!rows) throw new Error(`Response rows is empty`);
+        const playerArray: Array<string> = [player.first_name, player.last_name, player.email];
+        for (const row of rows) {
+            console.log(`row:`);
+            console.log(row);
+            console.log(`playerArray:`);
+            console.log(playerArray);
+            if (_.isEqual(row, playerArray)) {
+                return row[4];
+            }
+        } 
+        throw new Error(`Player not found in the sheet`);
+    } catch (err: Error | any) {
+        console.error(`The API returned an error: ${err.message}`);
+        throw new Error(`The API returned an error: ${err.message}`);
+    }
+}
+
+
 export async function sheetHasTooManyPlayer(player: IPlayer, sheetName: string): Promise<boolean> {
     try {
         const response = await sheet.spreadsheets.values.get({

@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreatePaymentResponse, Environment } from "square";
 import { IPlayer } from "./model/player";
-import { appendRowToSheet, checkAndAppendIfSundayExists, sheetContainsPlayer } from "./sheet";
+import { appendRowToSheet, checkAndAppendIfSundayExists, getPaymentId, sheetContainsPlayer } from "./sheet";
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
@@ -16,7 +16,7 @@ BigInt.prototype.toJSON = function () {
     return this.toString();
 };
 
-const { paymentsApi, customersApi } = new Client({
+const { paymentsApi, customersApi, refundsApi } = new Client({
     accessToken: process.env.SQUARE_ACCESS_TOKEN,
     environment: Environment.Sandbox
 });
@@ -65,14 +65,17 @@ payController.post(
         try {
             console.log(`Create body payment = `);
             console.log(JSON.stringify(body));
+            // add a new sheet if this week's sunday's date isn't a sheet name
             const sheetName = await checkAndAppendIfSundayExists();
             console.log(`sheetName = ${sheetName}`);
+            // check if player is already in the sheet
             const PlayerIsIn = await sheetContainsPlayer(body.player, sheetName);
             console.log(`is player in: ${PlayerIsIn}`);
             if (PlayerIsIn) {
                 console.log(`player is already in`);
                 return false;
             }
+            // add player to customer list in square
             const CustomerId = await addNonDuplicateCustomer(body.player);
             if (CustomerId === ``) {
                 throw new Error(`Customer not created or something went wrong with getting customerID: ${CustomerId}`);
@@ -86,6 +89,7 @@ payController.post(
                 },
                 customerId: CustomerId
             });
+            // TODO: need to change logic here so if >57 players, add to waiting list
             if (response.result.payment?.status == `COMPLETED`) {
                 await appendRowToSheet([body.player.first_name, body.player.last_name, body.player.email, body.player.phone_no, response.result.payment?.id!, `yes`], sheetName);
             }
@@ -98,6 +102,37 @@ payController.post(
         } catch (err) {
             console.log(err);
         }
+    },
+    {
+        body: t.Object({
+            sourceId: t.String(),
+            player: t.Object({
+                first_name: t.String(),
+                last_name: t.String(),
+                email: t.String(),
+                phone_no: t.String()
+            })
+        })
+    }
+);
+
+// TODO: WIP
+payController.post(
+    "/refundPayment",
+    async ({ body, set }) => {
+        const sheetName = await checkAndAppendIfSundayExists();
+        console.log(`sheetName = ${sheetName}`);
+        const paymentId = await getPaymentId(body.player, sheetName);
+        const response = await refundsApi.refundPayment({
+            idempotencyKey: randomUUID(),
+            amountMoney: {
+                amount: BigInt(100),
+                currency: `AUD`
+            },
+            paymentId: paymentId,
+            reason: `requested_by_customer`
+        });
+        return response;
     },
     {
         body: t.Object({

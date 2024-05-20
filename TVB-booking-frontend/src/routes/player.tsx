@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { emptyPlayer } from "../model/player";
+import payService from "../services/pay";
 
 const Player = () => {
     const [player, setPlayer] = useState(emptyPlayer);
@@ -22,6 +23,24 @@ const Player = () => {
             ...previousPlayer,
             [id]: value
         }));
+    };
+
+    // TODO: WIP
+    const refund = () => {
+        if (confirm("Are you sure you want to refund? please double check the details before proceeding")) {
+            try {
+                const response = payService.refundPayment(player);
+                if(!response){
+                    throw new Error("Refund unsuccessful");
+                }
+                alert("Refund successful");
+            } catch (err) {
+                console.log(err);
+                alert("Refund unsuccessful");
+            }
+        } else {
+            alert("you have cancelled the refund request");
+        }
     };
 
     return (
@@ -63,6 +82,10 @@ const Player = () => {
                     <div className="col-sm-4"></div>
                 </div>
             </form>
+            <br></br>
+            <button className="btn btn-primary" onClick={refund}>
+                Refund{" "}
+            </button>
         </div>
     );
 };
