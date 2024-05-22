@@ -26,17 +26,21 @@ const Player = () => {
     };
 
     // TODO: WIP
-    const refund = () => {
+    const refund = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
         if (confirm("Are you sure you want to refund? please double check the details before proceeding")) {
             try {
-                const response = payService.refundPayment(player);
-                if(!response){
+                console.log(player)
+                const response = await payService.refundPayment(player);
+                console.log(response);
+                // TODO click refund and test it!!!!!!!!!
+                if(!response || response.statusCode !== 200){
                     throw new Error("Refund unsuccessful");
                 }
                 alert("Refund successful");
             } catch (err) {
                 console.log(err);
-                alert("Refund unsuccessful");
+                alert("Refund unsuccessful caught error");
             }
         } else {
             alert("you have cancelled the refund request");

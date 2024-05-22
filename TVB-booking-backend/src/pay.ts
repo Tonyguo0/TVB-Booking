@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
-import { ApiResponse, Client, CreatePaymentResponse, Environment } from "square";
+import { ApiResponse, Client, CreatePaymentResponse, Environment, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
 import { appendRowToSheet, checkAndAppendIfSundayExists, getPaymentId, sheetContainsPlayer } from "./sheet";
 
@@ -118,25 +118,37 @@ payController.post(
 
 // TODO: WIP
 payController.post(
-    "/refundPayment",
+    `/refundPayment`,
     async ({ body, set }) => {
-        const sheetName = await checkAndAppendIfSundayExists();
-        console.log(`sheetName = ${sheetName}`);
-        const paymentId = await getPaymentId(body.player, sheetName);
-        const response = await refundsApi.refundPayment({
-            idempotencyKey: randomUUID(),
-            amountMoney: {
-                amount: BigInt(100),
-                currency: `AUD`
-            },
-            paymentId: paymentId,
-            reason: `requested_by_customer`
-        });
-        return response;
+        try {
+            console.log(`hello from refund payment`);
+            const sheetName = await checkAndAppendIfSundayExists();
+            console.log(`sheetName = ${sheetName}`);
+            const paymentId: string = await getPaymentId(body.player, sheetName);
+            console.log(`paymentId = ${paymentId}`);
+            const response:ApiResponse<RefundPaymentResponse> = await refundsApi.refundPayment({
+                idempotencyKey: randomUUID(),
+                amountMoney: {
+                    amount: BigInt(100),
+                    currency: `AUD`
+                },
+                paymentId: paymentId,
+                reason: `requested_by_customer`
+            });
+            set.status = 201;
+            set.headers["Content-Type"] = "application/json";
+            console.log(response.body);
+            if(response!= null && response.body!= null && response.body?.refund?.status == `PENDING`){
+                // TODO: DELETE PLAYER FROM SHEET
+                
+            }
+            return response;
+        } catch (err) {
+            console.log(err);
+        }
     },
     {
         body: t.Object({
-            sourceId: t.String(),
             player: t.Object({ first_name: t.String(), last_name: t.String(), email: t.String(), phone_no: t.String() })
         })
     }

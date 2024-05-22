@@ -59,21 +59,24 @@ export async function sheetContainsPlayer(player: IPlayer, sheetName: string): P
 
 export async function getPaymentId(player: IPlayer, sheetName: string): Promise<string> {
     try {
+        // REMEMBER: whenever you want to get more values in excel you have to increase the range e.g. A:E
         const response = await sheet.spreadsheets.values.get({
             spreadsheetId: process.env.spread_sheet_id,
             auth: auth,
-            range: `${sheetName}!A:C`
+            range: `${sheetName}!A:E`
         });
         console.log(`\nResponse = ${response?.data.values} \n`);
         const rows: Array<Array<string>> = response.data.values!;
         if (!rows) throw new Error(`Response rows is empty`);
-        const playerArray: Array<string> = [player.first_name, player.last_name, player.email];
+        const playerArray: Array<string> = [player.first_name, player.last_name, player.email, player.phone_no];
         for (const row of rows) {
             console.log(`row:`);
             console.log(row);
             console.log(`playerArray:`);
             console.log(playerArray);
-            if (_.isEqual(row, playerArray)) {
+            const rowsToCompare = row.slice(0,4);
+            console.log(`rowsToCompare: ${rowsToCompare}`);
+            if (_.isEqual(rowsToCompare, playerArray)) {
                 return row[4];
             }
         } 
@@ -185,3 +188,33 @@ export async function addSheets(sheetTitle: string): Promise<void> {
         console.error(error);
     }
 }
+
+function deleteRow() {
+    
+    const request = {
+        spreadsheetId: process.env.spread_sheet_id,
+        resource: {
+          requests: [
+            {
+              deleteDimension: {
+                range: {
+                  sheetId: process.env.spread_sheet_id,
+                  dimension: 'ROWS',
+                  startIndex: 1, // 0-based index, 1 refers to the second row
+                  endIndex: 3 // exclusive, 3 refers to the fourth row, which will not be deleted
+                }
+              }
+            }
+          ]
+        }
+      };
+      
+      sheets.spreadsheets.batchUpdate(request, (err, response) => {
+        if (err) {
+          console.error(err);
+          return;
+        }
+      
+        console.log(`Deleted rows: ${JSON.stringify(response.data, null, 2)}`);
+      });
+} 
