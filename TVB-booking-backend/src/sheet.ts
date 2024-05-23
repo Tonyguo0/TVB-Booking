@@ -74,19 +74,18 @@ export async function getPaymentId(player: IPlayer, sheetName: string): Promise<
             console.log(row);
             console.log(`playerArray:`);
             console.log(playerArray);
-            const rowsToCompare = row.slice(0,4);
+            const rowsToCompare = row.slice(0, 4);
             console.log(`rowsToCompare: ${rowsToCompare}`);
             if (_.isEqual(rowsToCompare, playerArray)) {
                 return row[4];
             }
-        } 
+        }
         throw new Error(`Player not found in the sheet`);
     } catch (err: Error | any) {
         console.error(`The API returned an error: ${err.message}`);
         throw new Error(`The API returned an error: ${err.message}`);
     }
 }
-
 
 export async function sheetHasTooManyPlayer(player: IPlayer, sheetName: string): Promise<boolean> {
     try {
@@ -103,11 +102,9 @@ export async function sheetHasTooManyPlayer(player: IPlayer, sheetName: string):
             const title = await getSheetTitle();
             appendRowToSheet(["waiting list:"], title);
             appendRowToSheet([" "], title);
-
-        } else if(rows.length > 57) {
+        } else if (rows.length > 57) {
             // TODO: add players to waiting list when there are more than 57 players
             // TODO: might have to change it to append row to sheets
-
         }
         for (const row of rows) {
             console.log(`row:`);
@@ -189,32 +186,51 @@ export async function addSheets(sheetTitle: string): Promise<void> {
     }
 }
 
-function deleteRow() {
-    
-    const request = {
-        spreadsheetId: process.env.spread_sheet_id,
-        resource: {
-          requests: [
-            {
-              deleteDimension: {
-                range: {
-                  sheetId: process.env.spread_sheet_id,
-                  dimension: 'ROWS',
-                  startIndex: 1, // 0-based index, 1 refers to the second row
-                  endIndex: 3 // exclusive, 3 refers to the fourth row, which will not be deleted
-                }
-              }
+// TODO: use + Test this function
+async function deleteRow(player: IPlayer, sheetName: string) {
+    try {
+        // Get the data from the sheet
+        const response = await sheet.spreadsheets.values.get({
+            spreadsheetId: process.env.spread_sheet_id,
+            range: `${sheetName}!A:D`
+        });
+
+        const rows = response.data.values;
+        if (rows) {
+            // Find the row with the correct info
+            const playerArray: Array<string> = [player.first_name, player.last_name, player.email, player.phone_no];
+            const rowIndex = rows.findIndex((row) => row.includes(playerArray));
+
+            if (rowIndex !== -1) {
+                // Delete the row
+                const request = {
+                    spreadsheetId: process.env.spread_sheet_id,
+                    resource: {
+                        requests: [
+                            {
+                                deleteDimension: {
+                                    range: {
+                                        sheetId: process.env.spread_sheet_id,
+                                        dimension: "ROWS",
+                                        startIndex: rowIndex,
+                                        endIndex: rowIndex + 1
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                };
+
+                const deleteResponse = await sheet.spreadsheets.batchUpdate(request);
+                console.log(`Deleted row: ${rowIndex + 1}`);
+                return deleteResponse;
+            } else {
+                console.log(`No row found with player information: ${playerArray}`);
             }
-          ]
+        } else {
+            console.log(`No data found in sheet: ${sheetName}`);
         }
-      };
-      
-      sheets.spreadsheets.batchUpdate(request, (err, response) => {
-        if (err) {
-          console.error(err);
-          return;
-        }
-      
-        console.log(`Deleted rows: ${JSON.stringify(response.data, null, 2)}`);
-      });
-} 
+    } catch (error: Error | any) {
+        console.error(error);
+    }
+}
