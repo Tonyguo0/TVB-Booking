@@ -3,6 +3,7 @@ import _ from "lodash";
 import path from "path";
 import { IPlayer } from "./model/player";
 import { getThisWeekSunday } from "./utils/utils";
+import { GaxiosPromise } from "googleapis-common";
 
 const auth = new google.auth.GoogleAuth({
     keyFile: path.join(import.meta.dir, `../`, `google-cred.json`),
@@ -187,7 +188,7 @@ export async function addSheets(sheetTitle: string): Promise<void> {
 }
 
 // TODO: use + Test this function
-async function deleteRow(player: IPlayer, sheetName: string) {
+export async function deleteRow(player: IPlayer, sheetName: string): Promise<GaxiosPromise<Schema$BatchUpdateSpreadsheetResponse>> {
     try {
         // Get the data from the sheet
         const response = await sheet.spreadsheets.values.get({
@@ -198,8 +199,12 @@ async function deleteRow(player: IPlayer, sheetName: string) {
         const rows = response.data.values;
         if (rows) {
             // Find the row with the correct info
+
             const playerArray: Array<string> = [player.first_name, player.last_name, player.email, player.phone_no];
-            const rowIndex = rows.findIndex((row) => row.includes(playerArray));
+            const rowIndex = rows.findIndex((row) => {
+                console.log(row);
+                return row.includes(playerArray);
+            });
 
             if (rowIndex !== -1) {
                 // Delete the row
