@@ -71,10 +71,10 @@ export async function getPaymentId(player: IPlayer, sheetName: string): Promise<
         if (!rows) throw new Error(`Response rows is empty`);
         const playerArray: Array<string> = [player.first_name, player.last_name, player.email, player.phone_no];
         for (const row of rows) {
-            console.log(`row:`);
-            console.log(row);
-            console.log(`playerArray:`);
-            console.log(playerArray);
+            // console.log(`row:`);
+            // console.log(row);
+            // console.log(`playerArray:`);
+            // console.log(playerArray);
             const rowsToCompare = row.slice(0, 4);
             console.log(`rowsToCompare: ${rowsToCompare}`);
             if (_.isEqual(rowsToCompare, playerArray)) {
@@ -188,12 +188,13 @@ export async function addSheets(sheetTitle: string): Promise<void> {
 }
 
 // TODO: use + Test this function
-export async function deleteRow(player: IPlayer, sheetName: string): Promise<GaxiosPromise<Schema$BatchUpdateSpreadsheetResponse>> {
+export async function deleteRow(player: IPlayer, sheetName: string) {
     try {
         // Get the data from the sheet
         const response = await sheet.spreadsheets.values.get({
             spreadsheetId: process.env.spread_sheet_id,
-            range: `${sheetName}!A:D`
+            range: `${sheetName}!A:D`,
+            auth: auth
         });
 
         const rows = response.data.values;
@@ -201,20 +202,25 @@ export async function deleteRow(player: IPlayer, sheetName: string): Promise<Gax
             // Find the row with the correct info
 
             const playerArray: Array<string> = [player.first_name, player.last_name, player.email, player.phone_no];
-            const rowIndex = rows.findIndex((row) => {
+            const rowIndex = rows.findIndex((row: Array<string>) => {
                 console.log(row);
-                return row.includes(playerArray);
+                const PlayerExcelRows = row.slice(0, 4);
+                console.log(`PlayerExcelRows: ${PlayerExcelRows}`)
+                console.log(`playerArray: ${playerArray}`)
+                return _.isEqual(PlayerExcelRows, playerArray);
             });
 
             if (rowIndex !== -1) {
                 // Delete the row
                 const request = {
                     spreadsheetId: process.env.spread_sheet_id,
+                    auth: auth,
                     resource: {
                         requests: [
                             {
                                 deleteDimension: {
                                     range: {
+                                        //TODO: need to use the sheetid from the gid= in the url instead
                                         sheetId: process.env.spread_sheet_id,
                                         dimension: "ROWS",
                                         startIndex: rowIndex,

@@ -127,7 +127,7 @@ payController.post(
             console.log(`sheetName = ${sheetName}`);
             const paymentId: string = await getPaymentId(player, sheetName);
             console.log(`paymentId = ${paymentId}`);
-            const response:ApiResponse<RefundPaymentResponse> = await refundsApi.refundPayment({
+            const response: ApiResponse<RefundPaymentResponse> = await refundsApi.refundPayment({
                 idempotencyKey: randomUUID(),
                 amountMoney: {
                     amount: BigInt(100),
@@ -138,10 +138,11 @@ payController.post(
             });
             set.status = 201;
             set.headers["Content-Type"] = "application/json";
-            console.log(response.body);
-            if(response!= null && response.body!= null && response.body?.refund?.status == `PENDING`){
+            console.log(response.result.refund);
+            
+            if (response != null && response.body != null && response.result?.refund?.status == `PENDING`) {
                 // TODO: DELETE PLAYER FROM SHEET
-                deleteRow(player, sheetName);
+                await deleteRow(player, sheetName);
             }
             return response;
         } catch (err) {
