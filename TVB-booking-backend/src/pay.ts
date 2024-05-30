@@ -116,17 +116,18 @@ payController.post(
     }
 );
 
-// TODO: WIP
 payController.post(
     `/refundPayment`,
     async ({ body, set }) => {
         try {
             const player: IPlayer = body.player;
             console.log(`hello from refund payment`);
+            // add a new sheet if this week's sunday's date isn't a sheet name
             const sheetName = await checkAndAppendIfSundayExists();
             console.log(`sheetName = ${sheetName}`);
             const paymentId: string = await getPaymentId(player, sheetName);
             console.log(`paymentId = ${paymentId}`);
+            // get the sheet id (the gid of the sheet) with the sheetName to delete the row
             const sheetId: string = await getSheetId(sheetName);
             const response: ApiResponse<RefundPaymentResponse> = await refundsApi.refundPayment({
                 idempotencyKey: randomUUID(),
@@ -142,7 +143,6 @@ payController.post(
             console.log(response.result.refund);
 
             if (response != null && response.body != null && response.result?.refund?.status == `PENDING`) {
-                // TODO: DELETE PLAYER FROM SHEET
                 await deleteRow(player, sheetName, sheetId);
             }
             return response;

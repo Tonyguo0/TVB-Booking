@@ -18,16 +18,53 @@ const sheets = google.sheets("v4");
  * @returns A Promise that resolves when the row is successfully appended.
  */
 export async function appendRowToSheet(response: Array<string>, sheetName: string) {
-    await sheets.spreadsheets.values.append({
-        spreadsheetId: process.env.spread_sheet_id,
-        auth: auth,
-        range: `${sheetName}`,
-        valueInputOption: "RAW",
-
-        requestBody: {
-            values: [[...response]]
-        }
-    });
+    const playerDetailsArray: Array<string> = response;
+    try {
+        await sheets.spreadsheets.values.append({
+            spreadsheetId: process.env.spread_sheet_id,
+            auth: auth,
+            range: `${sheetName}`,
+            valueInputOption: "RAW",
+    
+            requestBody: {
+                values: [[...playerDetailsArray]]
+            }
+        });
+        // TODO: waiting list logic to be implemented
+        // const response = await sheets.spreadsheets.values.get({
+        //     spreadsheetId: process.env.spread_sheet_id,
+        //     auth: auth,
+        //     range: `${sheetName}!A:C`
+        // });
+        // console.log(`\nResponse = ${response?.data.values} \n`);
+        // const rows: Array<Array<string>> = response.data.values!;
+        // if (!rows) throw new Error(`Response rows is empty`);
+        // // player.firstname, player.lastname, player.email
+        // const playerArray: Array<string> = [playerDetailsArray[0], playerDetailsArray[1], playerDetailsArray[2]];
+        // if (rows.length == 57) {
+        //     const title = await getSheetTitle();
+        //     appendRowToSheet(["waiting list:"], title);
+        //     appendRowToSheet([" "], title);
+        // } else if (rows.length > 57) {
+        //     // TODO: add players to waiting list when there are more than 57 players
+        //     // TODO: might have to change it to append row to sheets
+            
+        // }
+        // for (const row of rows) {
+        //     console.log(`row:`);
+        //     console.log(row);
+        //     console.log(`playerArray:`);
+        //     console.log(playerArray);
+        //     if (_.isEqual(row, playerArray)) {
+        //         return true;
+        //     }
+        // }
+        // return false;
+    } catch (err: Error | any) {
+        console.error(`The API returned an error: ${err.message}`);
+        return false;
+    }
+    
 }
 
 export async function sheetContainsPlayer(player: IPlayer, sheetName: string): Promise<boolean> {
@@ -84,41 +121,6 @@ export async function getPaymentId(player: IPlayer, sheetName: string): Promise<
     } catch (err: Error | any) {
         console.error(`The API returned an error: ${err.message}`);
         throw new Error(`The API returned an error: ${err.message}`);
-    }
-}
-
-export async function sheetHasTooManyPlayer(player: IPlayer, sheetName: string): Promise<boolean> {
-    try {
-        const response = await sheets.spreadsheets.values.get({
-            spreadsheetId: process.env.spread_sheet_id,
-            auth: auth,
-            range: `${sheetName}!A:C`
-        });
-        console.log(`\nResponse = ${response?.data.values} \n`);
-        const rows: Array<Array<string>> = response.data.values!;
-        if (!rows) throw new Error(`Response rows is empty`);
-        const playerArray: Array<string> = [player.first_name, player.last_name, player.email];
-        if (rows.length == 57) {
-            const title = await getSheetTitle();
-            appendRowToSheet(["waiting list:"], title);
-            appendRowToSheet([" "], title);
-        } else if (rows.length > 57) {
-            // TODO: add players to waiting list when there are more than 57 players
-            // TODO: might have to change it to append row to sheets
-        }
-        for (const row of rows) {
-            console.log(`row:`);
-            console.log(row);
-            console.log(`playerArray:`);
-            console.log(playerArray);
-            if (_.isEqual(row, playerArray)) {
-                return true;
-            }
-        }
-        return false;
-    } catch (err: Error | any) {
-        console.error(`The API returned an error: ${err.message}`);
-        return false;
     }
 }
 
@@ -197,7 +199,6 @@ export async function getSheetId(sheetName: string) {
     return String(sheet?.properties?.sheetId);
 }
 
-// TODO: use + Test this function
 export async function deleteRow(player: IPlayer, sheetName: string, sheetId: string) {
     try {
         // Get the data from the sheet
