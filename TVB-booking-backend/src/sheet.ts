@@ -3,13 +3,12 @@ import _ from "lodash";
 import path from "path";
 import { IPlayer } from "./model/player";
 import { getThisWeekSunday } from "./utils/utils";
-import { GaxiosPromise } from "googleapis-common";
 
 const auth = new google.auth.GoogleAuth({
     keyFile: path.join(import.meta.dir, `../`, `google-cred.json`),
     scopes: ["https://www.googleapis.com/auth/spreadsheets"]
 });
-const sheet = google.sheets("v4");
+const sheets = google.sheets("v4");
 
 /**
  * Appends a row to the specified sheet in a Google Spreadsheet.
@@ -19,7 +18,7 @@ const sheet = google.sheets("v4");
  * @returns A Promise that resolves when the row is successfully appended.
  */
 export async function appendRowToSheet(response: Array<string>, sheetName: string) {
-    await sheet.spreadsheets.values.append({
+    await sheets.spreadsheets.values.append({
         spreadsheetId: process.env.spread_sheet_id,
         auth: auth,
         range: `${sheetName}`,
@@ -33,7 +32,7 @@ export async function appendRowToSheet(response: Array<string>, sheetName: strin
 
 export async function sheetContainsPlayer(player: IPlayer, sheetName: string): Promise<boolean> {
     try {
-        const response = await sheet.spreadsheets.values.get({
+        const response = await sheets.spreadsheets.values.get({
             spreadsheetId: process.env.spread_sheet_id,
             auth: auth,
             range: `${sheetName}!A:C`
@@ -61,7 +60,7 @@ export async function sheetContainsPlayer(player: IPlayer, sheetName: string): P
 export async function getPaymentId(player: IPlayer, sheetName: string): Promise<string> {
     try {
         // REMEMBER: whenever you want to get more values in excel you have to increase the range e.g. A:E
-        const response = await sheet.spreadsheets.values.get({
+        const response = await sheets.spreadsheets.values.get({
             spreadsheetId: process.env.spread_sheet_id,
             auth: auth,
             range: `${sheetName}!A:E`
@@ -90,7 +89,7 @@ export async function getPaymentId(player: IPlayer, sheetName: string): Promise<
 
 export async function sheetHasTooManyPlayer(player: IPlayer, sheetName: string): Promise<boolean> {
     try {
-        const response = await sheet.spreadsheets.values.get({
+        const response = await sheets.spreadsheets.values.get({
             spreadsheetId: process.env.spread_sheet_id,
             auth: auth,
             range: `${sheetName}!A:C`
@@ -125,16 +124,16 @@ export async function sheetHasTooManyPlayer(player: IPlayer, sheetName: string):
 
 export async function getSheetTitle(): Promise<string> {
     try {
-        const spreadSheetResponse = await sheet.spreadsheets.get({
+        const spreadSheetResponse = await sheets.spreadsheets.get({
             spreadsheetId: process.env.spread_sheet_id,
             auth: auth
         });
-        const sheets = spreadSheetResponse.data.sheets;
+        const sheet = spreadSheetResponse.data.sheets;
         if (sheets == null) {
             console.error(`could not get sheet data from google API spreadsheets`);
             throw new Error(`could not get sheet data from google API spreadsheets`);
         }
-        const latestSheet: string = sheets?.[sheets?.length - 1].properties?.title!;
+        const latestSheet: string = sheet?.[sheet?.length - 1].properties?.title!;
         console.log(sheets);
         console.log(`latest sheet is: ${latestSheet}`);
         return latestSheet;
@@ -180,18 +179,29 @@ export async function addSheets(sheetTitle: string): Promise<void> {
                 ]
             }
         };
-        const response = await sheet.spreadsheets.batchUpdate(request);
+        const response = await sheets.spreadsheets.batchUpdate(request);
         console.log(JSON.stringify(response, null, 2));
     } catch (error: Error | any) {
         console.error(error);
     }
 }
 
+export async function getSheetId(sheetName: string) {
+    const response = await sheets.spreadsheets.get({
+        spreadsheetId: process.env.spread_sheet_id,
+        auth: auth
+    });
+
+    const sheet = response.data.sheets?.find((sheet) => sheet.properties?.title === sheetName);
+
+    return String(sheet?.properties?.sheetId);
+}
+
 // TODO: use + Test this function
-export async function deleteRow(player: IPlayer, sheetName: string) {
+export async function deleteRow(player: IPlayer, sheetName: string, sheetId: string) {
     try {
         // Get the data from the sheet
-        const response = await sheet.spreadsheets.values.get({
+        const response = await sheets.spreadsheets.values.get({
             spreadsheetId: process.env.spread_sheet_id,
             range: `${sheetName}!A:D`,
             auth: auth
@@ -205,8 +215,8 @@ export async function deleteRow(player: IPlayer, sheetName: string) {
             const rowIndex = rows.findIndex((row: Array<string>) => {
                 console.log(row);
                 const PlayerExcelRows = row.slice(0, 4);
-                console.log(`PlayerExcelRows: ${PlayerExcelRows}`)
-                console.log(`playerArray: ${playerArray}`)
+                console.log(`PlayerExcelRows: ${PlayerExcelRows}`);
+                console.log(`playerArray: ${playerArray}`);
                 return _.isEqual(PlayerExcelRows, playerArray);
             });
 
@@ -220,8 +230,7 @@ export async function deleteRow(player: IPlayer, sheetName: string) {
                             {
                                 deleteDimension: {
                                     range: {
-                                        //TODO: need to use the sheetid from the gid= in the url instead
-                                        sheetId: process.env.spread_sheet_id,
+                                        sheetId: sheetId,
                                         dimension: "ROWS",
                                         startIndex: rowIndex,
                                         endIndex: rowIndex + 1
@@ -232,7 +241,7 @@ export async function deleteRow(player: IPlayer, sheetName: string) {
                     }
                 };
 
-                const deleteResponse = await sheet.spreadsheets.batchUpdate(request);
+                const deleteResponse = await sheets.spreadsheets.batchUpdate(request);
                 console.log(`Deleted row: ${rowIndex + 1}`);
                 return deleteResponse;
             } else {

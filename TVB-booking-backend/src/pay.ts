@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreatePaymentResponse, Environment, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
-import { appendRowToSheet, checkAndAppendIfSundayExists, deleteRow, getPaymentId, sheetContainsPlayer } from "./sheet";
+import { appendRowToSheet, checkAndAppendIfSundayExists, deleteRow, getPaymentId, getSheetId, sheetContainsPlayer } from "./sheet";
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
@@ -127,6 +127,7 @@ payController.post(
             console.log(`sheetName = ${sheetName}`);
             const paymentId: string = await getPaymentId(player, sheetName);
             console.log(`paymentId = ${paymentId}`);
+            const sheetId: string = await getSheetId(sheetName);
             const response: ApiResponse<RefundPaymentResponse> = await refundsApi.refundPayment({
                 idempotencyKey: randomUUID(),
                 amountMoney: {
@@ -139,10 +140,10 @@ payController.post(
             set.status = 201;
             set.headers["Content-Type"] = "application/json";
             console.log(response.result.refund);
-            
+
             if (response != null && response.body != null && response.result?.refund?.status == `PENDING`) {
                 // TODO: DELETE PLAYER FROM SHEET
-                await deleteRow(player, sheetName);
+                await deleteRow(player, sheetName, sheetId);
             }
             return response;
         } catch (err) {
