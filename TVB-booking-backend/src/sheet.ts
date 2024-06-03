@@ -3,12 +3,30 @@ import _ from "lodash";
 import path from "path";
 import { IPlayer } from "./model/player";
 import { getThisWeekSunday } from "./utils/utils";
+import { createPayment } from "./pay";
 
 const auth = new google.auth.GoogleAuth({
     keyFile: path.join(import.meta.dir, `../`, `google-cred.json`),
     scopes: ["https://www.googleapis.com/auth/spreadsheets"]
 });
 const sheets = google.sheets("v4");
+
+async function appendRowToSheet(response: Array<string>, sheetName: string) {
+    try {
+        await sheets.spreadsheets.values.append({
+            spreadsheetId: process.env.spread_sheet_id,
+            auth: auth,
+            range: `${sheetName}`,
+            valueInputOption: "RAW",
+
+            requestBody: {
+                values: [[...response]]
+            }
+        });
+    } catch (err: Error | any) {
+        console.error(`The API returned an error: ${err.message}`);
+    }
+}
 
 /**
  * Appends a row to the specified sheet in a Google Spreadsheet.
@@ -17,54 +35,53 @@ const sheets = google.sheets("v4");
  * @param sheetName - The name of the sheet where the row should be appended.
  * @returns A Promise that resolves when the row is successfully appended.
  */
-export async function appendRowToSheet(response: Array<string>, sheetName: string) {
-    const playerDetailsArray: Array<string> = response;
+// TODO: create new model for body
+export async function checkAndAddRowToSheet(body: { sourceId: string; player: { first_name: string; last_name: string; email: string; phone_no: string } }, customerId: string, sheetName: string) {
+    // TODO: use createPayment(sourceId: string, CustomerId: string)
+    const response = createPayment(body.sourceId, customerId);
+    // TODO: add to the correct coloumns of excel sheet payid: response.result.payment?.id!, paid or not: `yes` 
+    const playerDetailsArray: Array<string> = [body.player.first_name, body.player.last_name, body.player.email, body.player.phone_no];
     try {
-        await sheets.spreadsheets.values.append({
+        // TODO: waiting list logic to be implemented
+        const response = await sheets.spreadsheets.values.get({
             spreadsheetId: process.env.spread_sheet_id,
             auth: auth,
-            range: `${sheetName}`,
-            valueInputOption: "RAW",
-    
-            requestBody: {
-                values: [[...playerDetailsArray]]
-            }
+            range: `${sheetName}!A:D`
         });
-        // TODO: waiting list logic to be implemented
-        // const response = await sheets.spreadsheets.values.get({
-        //     spreadsheetId: process.env.spread_sheet_id,
-        //     auth: auth,
-        //     range: `${sheetName}!A:C`
-        // });
-        // console.log(`\nResponse = ${response?.data.values} \n`);
-        // const rows: Array<Array<string>> = response.data.values!;
-        // if (!rows) throw new Error(`Response rows is empty`);
-        // // player.firstname, player.lastname, player.email
-        // const playerArray: Array<string> = [playerDetailsArray[0], playerDetailsArray[1], playerDetailsArray[2]];
-        // if (rows.length == 57) {
-        //     const title = await getSheetTitle();
-        //     appendRowToSheet(["waiting list:"], title);
-        //     appendRowToSheet([" "], title);
-        // } else if (rows.length > 57) {
-        //     // TODO: add players to waiting list when there are more than 57 players
-        //     // TODO: might have to change it to append row to sheets
-            
-        // }
-        // for (const row of rows) {
-        //     console.log(`row:`);
-        //     console.log(row);
-        //     console.log(`playerArray:`);
-        //     console.log(playerArray);
-        //     if (_.isEqual(row, playerArray)) {
-        //         return true;
-        //     }
-        // }
-        // return false;
+        console.log(`\nResponse = ${response?.data.values} \n`);
+        const rows: Array<Array<string>> = response.data.values!;
+        if (!rows) throw new Error(`Response rows is empty`);
+        // player.firstname, player.lastname, player.email
+
+        const playerArray: Array<string> = [playerDetailsArray[0], playerDetailsArray[1], playerDetailsArray[2], playerDetailsArray[3]];
+        if (rows.length < 57) {
+            // TODO: append until 56 players to the row
+            appendRowToSheet(playerDetailsArray, sheetName);
+        } else if (rows.length == 57) {
+            // TODO: add a empty row then append the waiting list title after wards then append the players to waiting list after that
+            appendRowToSheet([" "], sheetName);
+            appendRowToSheet(["waiting list:"], sheetName);
+            appendRowToSheet(playerDetailsArray, sheetName);
+        } else if (rows.length > 57) {
+            appendRowToSheet(playerDetailsArray, sheetName);
+
+            // TODO: add players to waiting list when there are more than 57 players
+            // TODO: might have to change it to append row to sheets
+        }
+        for (const row of rows) {
+            console.log(`row:`);
+            console.log(row);
+            console.log(`playerArray:`);
+            console.log(playerArray);
+            if (_.isEqual(row, playerArray)) {
+                return true;
+            }
+        }
+        return false;
     } catch (err: Error | any) {
         console.error(`The API returned an error: ${err.message}`);
         return false;
     }
-    
 }
 
 export async function sheetContainsPlayer(player: IPlayer, sheetName: string): Promise<boolean> {
