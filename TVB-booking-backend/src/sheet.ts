@@ -36,7 +36,8 @@ async function appendRowToSheet(response: Array<string>, sheetName: string) {
  * @param sheetName - The name of the sheet where the row should be appended.
  * @returns A Promise that resolves when the row is successfully appended.
  */
-// TODO: create new model for body
+// TODO: adjust the fucntion to append the empty rows when we reach the waiting list
+// TODO: add functionality in refund so that it deletes the row of the player and add another player from the waiting list to replace the old player
 export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: string, sheetName: string) {
     // TODO: add to the correct coloumns of excel sheet payid: response.result.payment?.id!, paid or not: `yes`
     const playerDetailsArray: Array<string> = [body.player.first_name, body.player.last_name, body.player.email, body.player.phone_no];
