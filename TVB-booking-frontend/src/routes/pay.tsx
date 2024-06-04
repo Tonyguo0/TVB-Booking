@@ -35,11 +35,15 @@ const Pay = () => {
                     try {
                         const response = await payService.createPay(player, token.token);
                         console.log(response);
-                        if (response === false) {
+                        if (response === true) {
+                            alert(`player is on the waiting list!`);
+                            navigate(`/`);
+                        }
+                        else if (response === false) {
                             alert(`player has already registered in TVB!`);
                             navigate(`/`);
                         }
-                        if (response?.result?.payment.status === `COMPLETED`) {
+                        else if (response?.result?.payment.status === `COMPLETED`) {
                             alert(`payment successful`);
                             navigate(`/`);
                         }

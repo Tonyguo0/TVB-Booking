@@ -1,9 +1,10 @@
 import { google } from "googleapis";
 import _ from "lodash";
 import path from "path";
+import { IcreatePaybody } from "./model/createPayBody";
 import { IPlayer } from "./model/player";
-import { getThisWeekSunday } from "./utils/utils";
 import { createPayment } from "./pay";
+import { getThisWeekSunday } from "./utils/utils";
 
 const auth = new google.auth.GoogleAuth({
     keyFile: path.join(import.meta.dir, `../`, `google-cred.json`),
@@ -36,10 +37,8 @@ async function appendRowToSheet(response: Array<string>, sheetName: string) {
  * @returns A Promise that resolves when the row is successfully appended.
  */
 // TODO: create new model for body
-export async function checkAndAddRowToSheet(body: { sourceId: string; player: { first_name: string; last_name: string; email: string; phone_no: string } }, customerId: string, sheetName: string) {
-    // TODO: use createPayment(sourceId: string, CustomerId: string)
-    const response = createPayment(body.sourceId, customerId);
-    // TODO: add to the correct coloumns of excel sheet payid: response.result.payment?.id!, paid or not: `yes` 
+export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: string, sheetName: string) {
+    // TODO: add to the correct coloumns of excel sheet payid: response.result.payment?.id!, paid or not: `yes`
     const playerDetailsArray: Array<string> = [body.player.first_name, body.player.last_name, body.player.email, body.player.phone_no];
     try {
         // TODO: waiting list logic to be implemented
@@ -48,7 +47,7 @@ export async function checkAndAddRowToSheet(body: { sourceId: string; player: { 
             auth: auth,
             range: `${sheetName}!A:D`
         });
-        console.log(`\nResponse = ${response?.data.values} \n`);
+        // console.log(`\nResponse = ${response?.data.values} \n`);
         const rows: Array<Array<string>> = response.data.values!;
         if (!rows) throw new Error(`Response rows is empty`);
         // player.firstname, player.lastname, player.email
@@ -56,31 +55,33 @@ export async function checkAndAddRowToSheet(body: { sourceId: string; player: { 
         const playerArray: Array<string> = [playerDetailsArray[0], playerDetailsArray[1], playerDetailsArray[2], playerDetailsArray[3]];
         if (rows.length < 57) {
             // TODO: append until 56 players to the row
-            appendRowToSheet(playerDetailsArray, sheetName);
+            // TODO: use createPayment(sourceId: string, CustomerId: string)
+            const paymentResponse = await createPayment(body.sourceId, customerId);
+            // console.log(`paymentResponse = ${JSON.stringify(paymentResponse, null, 2)}`);
+            appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
+            // return paymentResponse here
+            return paymentResponse;
         } else if (rows.length == 57) {
             // TODO: add a empty row then append the waiting list title after wards then append the players to waiting list after that
             appendRowToSheet([" "], sheetName);
             appendRowToSheet(["waiting list:"], sheetName);
             appendRowToSheet(playerDetailsArray, sheetName);
-        } else if (rows.length > 57) {
+        } else {
             appendRowToSheet(playerDetailsArray, sheetName);
-
-            // TODO: add players to waiting list when there are more than 57 players
-            // TODO: might have to change it to append row to sheets
         }
-        for (const row of rows) {
-            console.log(`row:`);
-            console.log(row);
-            console.log(`playerArray:`);
-            console.log(playerArray);
-            if (_.isEqual(row, playerArray)) {
-                return true;
-            }
-        }
-        return false;
+        // for (const row of rows) {
+        //     console.log(`row:`);
+        //     console.log(row);
+        //     console.log(`playerArray:`);
+        //     console.log(playerArray);
+        //     if (_.isEqual(row, playerArray)) {
+        //         return true;
+        //     }
+        // }
+        // TODO: true represents player on waiitng list
+        return true;
     } catch (err: Error | any) {
-        console.error(`The API returned an error: ${err.message}`);
-        return false;
+        throw new Error(`The API returned an error: ${err.message}`);
     }
 }
 

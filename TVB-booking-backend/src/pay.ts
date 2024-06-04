@@ -71,8 +71,9 @@ export async function createPayment(sourceId: string, CustomerId: string) {
             customerId: CustomerId
         });
         // TODO: need to add this somewhere
-        // 
+        //
         if (response == null || response.result == null || response.result.payment?.status != `COMPLETED`) throw new Error(`Payment not completed: ${JSON.stringify(response, null, 2)}`);
+        console.log(`payment successful!!`);
         return response;
     } catch (err) {
         throw err;
@@ -93,6 +94,7 @@ payController.post(
             console.log(`is player in: ${PlayerIsIn}`);
             if (PlayerIsIn) {
                 console.log(`player is already in`);
+                // TODO: represents player is already in the google sheet
                 return false;
             }
             // add player to customer list in square
@@ -111,13 +113,14 @@ payController.post(
             // TODO: choice 2 is probably better
 
             const response = await checkAndAddRowToSheet(body, CustomerId, sheetName);
-            
+
             // TODO: need to add in error handling for other payment response statuses here
             // console.log(`result = `);
             // console.log(result);
             set.status = 201;
             set.headers["Content-Type"] = "application/json";
-            return JSON.stringify(response);
+
+            return response === true? response: JSON.stringify(response);
         } catch (err) {
             console.log(err);
         }
