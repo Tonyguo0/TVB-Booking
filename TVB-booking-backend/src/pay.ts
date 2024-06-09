@@ -1,9 +1,9 @@
+import { CronJob } from "cron";
 import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreatePaymentResponse, Environment, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
 import { checkAndAddRowToSheet, checkAndAppendIfSundayExists, deleteRow, getPaymentId, getSheetId, sheetContainsPlayer } from "./sheet";
-
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
     interface BigInt {
@@ -102,16 +102,6 @@ payController.post(
             if (CustomerId === ``) {
                 throw new Error(`Customer not created or something went wrong with getting customerID: ${CustomerId}`);
             }
-
-            // TODO: need to change logic here so if >57 players, add to waiting list
-
-            // TODO:
-            // TODO: choice 1: if I just get everyone to pay, then at the end I have to refund everyone who is on the waiting list
-            // TODO:
-            // TODO: choice 2: If I only get them to pay when they need to pay, then I don't have to refund anyone who's on the waiting list
-            // TODO: but I do have to change the code to cater for when someone's in the waiting list or not and when they get above the waiting lis then they need to pay
-            // TODO: choice 2 is probably better
-
             const response = await checkAndAddRowToSheet(body, CustomerId, sheetName);
 
             // TODO: need to add in error handling for other payment response statuses here
@@ -120,7 +110,7 @@ payController.post(
             set.status = 201;
             set.headers["Content-Type"] = "application/json";
 
-            return response === true? response: JSON.stringify(response);
+            return response === true ? response : JSON.stringify(response);
         } catch (err) {
             console.log(err);
         }
@@ -177,4 +167,24 @@ payController.post(
             player: t.Object({ first_name: t.String(), last_name: t.String(), email: t.String(), phone_no: t.String() })
         })
     }
+);
+
+// Schedule a task to run at a specific date and time
+// The cron syntax is 'second minute hour day month dayOfWeek'
+// This will run at 00:00:00 on December 31
+const job = new CronJob(
+    // seconds, minutes, hours, day of month, month, day of week
+    "00 11 22 09 06 *",
+    () => {
+        try {
+            // working!!!
+            // Replace this with the actual logic to refund the payment
+            console.log(`hello from cron job`);
+        } catch (err) {
+            console.error(err);
+        }
+    },
+    null,
+    true,
+    "Australia/Perth"
 );

@@ -12,6 +12,7 @@
   "dependencies": {
     "@elysiajs/cors": "^0.8.0",
     "@types/node": "^20.10.6",
+    "cron": "^3.1.7",
     "elysia": "latest",
     "googleapis": "^129.0.0",
     "lodash": "^4.17.21",

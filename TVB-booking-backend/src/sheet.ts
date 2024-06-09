@@ -21,7 +21,7 @@ async function appendRowToSheet(response: Array<string>, sheetName: string) {
             valueInputOption: "RAW",
 
             requestBody: {
-                values: [[...response]]
+                values: [response]
             }
         });
     } catch (err: Error | any) {
@@ -48,27 +48,28 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
             auth: auth,
             range: `${sheetName}!A:D`
         });
-        // console.log(`\nResponse = ${response?.data.values} \n`);
         const rows: Array<Array<string>> = response.data.values!;
         if (!rows) throw new Error(`Response rows is empty`);
         // player.firstname, player.lastname, player.email
 
+        // TODO: figure out what this is for?
         const playerArray: Array<string> = [playerDetailsArray[0], playerDetailsArray[1], playerDetailsArray[2], playerDetailsArray[3]];
-        if (rows.length < 57) {
-            // TODO: append until 56 players to the row
-            // TODO: use createPayment(sourceId: string, CustomerId: string)
-            const paymentResponse = await createPayment(body.sourceId, customerId);
+        const paymentResponse = await createPayment(body.sourceId, customerId);
+        if (rows.length == 57) {
+            // TODO: add a empty row then append the waiting list title after wards then append the players to waiting list after that
+            // TODO: can create a None then replace any None word in the google sheet with empty space
+            
+            // number of columns
+            await appendRowToSheet(["", " ", "     "], sheetName);
+            await appendRowToSheet(["waiting list:"], sheetName);
+            await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
+        } else {
+     
+            
             // console.log(`paymentResponse = ${JSON.stringify(paymentResponse, null, 2)}`);
-            appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
+            await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
             // return paymentResponse here
             return paymentResponse;
-        } else if (rows.length == 57) {
-            // TODO: add a empty row then append the waiting list title after wards then append the players to waiting list after that
-            appendRowToSheet([" "], sheetName);
-            appendRowToSheet(["waiting list:"], sheetName);
-            appendRowToSheet(playerDetailsArray, sheetName);
-        } else {
-            appendRowToSheet(playerDetailsArray, sheetName);
         }
         // for (const row of rows) {
         //     console.log(`row:`);
@@ -201,7 +202,7 @@ export async function addSheets(sheetTitle: string): Promise<void> {
             }
         };
         const response = await sheets.spreadsheets.batchUpdate(request);
-        console.log(JSON.stringify(response, null, 2));
+        // TODO: implement throwing errors
     } catch (error: Error | any) {
         console.error(error);
     }
@@ -233,7 +234,6 @@ export async function deleteRow(player: IPlayer, sheetName: string, sheetId: str
 
             const playerArray: Array<string> = [player.first_name, player.last_name, player.email, player.phone_no];
             const rowIndex = rows.findIndex((row: Array<string>) => {
-                console.log(row);
                 const PlayerExcelRows = row.slice(0, 4);
                 console.log(`PlayerExcelRows: ${PlayerExcelRows}`);
                 console.log(`playerArray: ${playerArray}`);
