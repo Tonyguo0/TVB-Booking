@@ -1,4 +1,4 @@
-import { google } from "googleapis";
+import { google, sheets_v4 } from "googleapis";
 import _ from "lodash";
 import path from "path";
 import { IcreatePaybody } from "./model/createPayBody";
@@ -26,6 +26,60 @@ async function appendRowToSheet(response: Array<string>, sheetName: string) {
         });
     } catch (err: Error | any) {
         console.error(`The API returned an error: ${err.message}`);
+    }
+}
+
+async function replaceValueInSheet(range: string, replacementValue: string) {
+    try {
+        const sheets = google.sheets({ version: "v4", auth: auth });
+
+        const request = {
+            spreadsheetId: process.env.spread_sheet_id,
+            resource: {
+                valueInputOption: "RAW",
+                data: [
+                    {
+                        range: range,
+                        values: [[replacementValue]]
+                    }
+                ]
+            }
+        };
+
+        await sheets.spreadsheets.values.batchUpdate(request);
+        console.log(`Value in ${range} updated to "${""}"`);
+    } catch (err: Error | any) {
+        console.error(`Failed to update value in sheet: ${err.message}`);
+    }
+}
+
+async function insertRow(sheetId: number, insertAtIndex: number) {
+    const sheets: sheets_v4.Sheets = google.sheets({ version: "v4", auth: auth });
+
+    const request = {
+        spreadsheetId: process.env.spread_sheet_id,
+        resource: {
+            requests: [
+                {
+                    insertDimension: {
+                        range: {
+                            sheetId: sheetId,
+                            dimension: "ROWS", // Use 'COLUMNS' to insert columns
+                            startIndex: insertAtIndex, // Index where the new row will be inserted
+                            endIndex: insertAtIndex + 1 // Insert one row
+                        },
+                        inheritFromBefore: false // Set to true if you want the new row to inherit formatting from the row before the insertion point
+                    }
+                }
+            ]
+        }
+    };
+
+    try {
+        await sheets.spreadsheets.batchUpdate(request);
+        console.log(`Row inserted at index ${insertAtIndex}`);
+    } catch (err: Error | any) {
+        console.error(`Failed to insert row: ${err.message}`);
     }
 }
 
@@ -57,19 +111,19 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
         const paymentResponse = await createPayment(body.sourceId, customerId);
         if (rows.length == 57) {
             // TODO: add a empty row then append the waiting list title after wards then append the players to waiting list after that
-            // TODO: can create a None then replace any None word in the google sheet with empty space
-            
             // number of columns
-            await appendRowToSheet(["", " ", "     "], sheetName);
+            await appendRowToSheet(["replacementValue"], sheetName);
             await appendRowToSheet(["waiting list:"], sheetName);
+            await replaceValueInSheet(`${sheetName}!A58`, ` `);
             await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
-        } else {
-     
-            
-            // console.log(`paymentResponse = ${JSON.stringify(paymentResponse, null, 2)}`);
+        } else if (rows.length < 57) {
             await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
             // return paymentResponse here
             return paymentResponse;
+        } else {
+            // console.log(`paymentResponse = ${JSON.stringify(paymentResponse, null, 2)}`);
+            await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
+            // return paymentResponse here
         }
         // for (const row of rows) {
         //     console.log(`row:`);
@@ -92,12 +146,12 @@ export async function sheetContainsPlayer(player: IPlayer, sheetName: string): P
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId: process.env.spread_sheet_id,
             auth: auth,
-            range: `${sheetName}!A:C`
+            range: `${sheetName}!A:D`
         });
         console.log(`\nResponse = ${response?.data.values} \n`);
         const rows: Array<Array<string>> = response.data.values!;
         if (!rows) throw new Error(`Response rows is empty`);
-        const playerArray: Array<string> = [player.first_name, player.last_name, player.email];
+        const playerArray: Array<string> = [player.first_name, player.last_name, player.email, player.phone_no];
         for (const row of rows) {
             console.log(`row:`);
             console.log(row);

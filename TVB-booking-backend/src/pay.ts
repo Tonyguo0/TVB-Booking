@@ -156,6 +156,11 @@ payController.post(
 
             if (response != null && response.body != null && response.result?.refund?.status == `PENDING`) {
                 await deleteRow(player, sheetName, sheetId);
+                // TODO: add logic to replace the row which the player was deleted from with the next player in the waiting list
+                // TODO: find the row from deleterow (add response to be the row number) 
+                // TODO: and use insertRow with row number and replaceValueInSheet with row number and value from row 59
+                // TODO: then delete row 59
+
             }
             return response;
         } catch (err) {
