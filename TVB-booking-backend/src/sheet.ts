@@ -90,19 +90,12 @@ async function insertRow(sheetId: number, insertAtIndex: number) {
  * @param sheetName - The name of the sheet where the row should be appended.
  * @returns A Promise that resolves when the row is successfully appended.
  */
-// TODO: adjust the fucntion to append the empty rows when we reach the waiting list
 // TODO: add functionality in refund so that it deletes the row of the player and add another player from the waiting list to replace the old player
 export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: string, sheetName: string) {
     // TODO: add to the correct coloumns of excel sheet payid: response.result.payment?.id!, paid or not: `yes`
     const playerDetailsArray: Array<string> = [body.player.first_name, body.player.last_name, body.player.email, body.player.phone_no];
     try {
-        // TODO: waiting list logic to be implemented
-        const response = await sheets.spreadsheets.values.get({
-            spreadsheetId: process.env.spread_sheet_id,
-            auth: auth,
-            range: `${sheetName}!A:D`
-        });
-        const rows: Array<Array<string>> = response.data.values!;
+        const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
         if (!rows) throw new Error(`Response rows is empty`);
         // player.firstname, player.lastname, player.email
 
@@ -115,7 +108,7 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
             // number of columns
             await appendRowToSheet(["replacementValue"], sheetName);
             await appendRowToSheet(["waiting list:"], sheetName);
-            await replaceValueInSheet(`${sheetName}!A58`, ` `);
+            await replaceValueInSheet(`${sheetName}!A57`, ` `);
             await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
         } else if (rows.length < Number(process.env.MAX_PLAYERS)) {
             await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
@@ -141,16 +134,25 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
         throw new Error(`The API returned an error: ${err.message}`);
     }
 }
-
-export async function sheetContainsPlayer(player: IPlayer, sheetName: string): Promise<boolean> {
+async function getRow(sheetName: string, rowLetterFrom: string, rowLetterTo: string): Promise<string[][]> {
     try {
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId: process.env.spread_sheet_id,
             auth: auth,
-            range: `${sheetName}!A:D`
+            range: `${sheetName}!${rowLetterFrom}:${rowLetterTo}`
         });
         console.log(`\nResponse = ${response?.data.values} \n`);
-        const rows: Array<Array<string>> = response.data.values!;
+        const row: Array<Array<string>> = response.data.values!;
+        return row;
+    } catch (err: Error | any) {
+        console.error(`The API returned an error: ${err.message}`);
+        return err;
+    }
+}
+
+export async function sheetContainsPlayer(player: IPlayer, sheetName: string): Promise<boolean> {
+    try {
+        const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
         if (!rows) throw new Error(`Response rows is empty`);
         const playerArray: Array<string> = [player.first_name, player.last_name, player.email, player.phone_no];
         for (const row of rows) {
@@ -172,13 +174,7 @@ export async function sheetContainsPlayer(player: IPlayer, sheetName: string): P
 export async function getPaymentId(player: IPlayer, sheetName: string): Promise<string> {
     try {
         // REMEMBER: whenever you want to get more values in excel you have to increase the range e.g. A:E
-        const response = await sheets.spreadsheets.values.get({
-            spreadsheetId: process.env.spread_sheet_id,
-            auth: auth,
-            range: `${sheetName}!A:E`
-        });
-        console.log(`\nResponse = ${response?.data.values} \n`);
-        const rows: Array<Array<string>> = response.data.values!;
+        const rows: Array<Array<string>> = await getRow(sheetName, `A`, `E`);
         if (!rows) throw new Error(`Response rows is empty`);
         const playerArray: Array<string> = [player.first_name, player.last_name, player.email, player.phone_no];
         for (const row of rows) {
@@ -277,13 +273,7 @@ export async function getSheetId(sheetName: string) {
 export async function deleteRow(player: IPlayer, sheetName: string, sheetId: string) {
     try {
         // Get the data from the sheet
-        const response = await sheets.spreadsheets.values.get({
-            spreadsheetId: process.env.spread_sheet_id,
-            range: `${sheetName}!A:D`,
-            auth: auth
-        });
-
-        const rows = response.data.values;
+        const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
         if (rows) {
             // Find the row with the correct info
 
