@@ -270,6 +270,21 @@ export async function getSheetId(sheetName: string) {
     return String(sheet?.properties?.sheetId);
 }
 
+async function findRowIndexBasedOnPlayer(player: IPlayer, rows: Array<Array<string>>): Promise<number> {
+    try {
+        const playerArray: Array<string> = [player.first_name, player.last_name, player.email, player.phone_no];
+        const rowIndex = rows.findIndex((row: Array<string>) => {
+            const PlayerExcelRows = row.slice(0, 4);
+            console.log(`PlayerExcelRows: ${PlayerExcelRows}`);
+            console.log(`playerArray: ${playerArray}`);
+            return _.isEqual(PlayerExcelRows, playerArray);
+        });
+        return rowIndex;
+    } catch (err: Error | any) {
+        throw new Error(`Error in findRowIndex: ${err.message}`);
+    }
+}
+
 export async function deleteRow(player: IPlayer, sheetName: string, sheetId: string) {
     try {
         // Get the data from the sheet
@@ -277,13 +292,7 @@ export async function deleteRow(player: IPlayer, sheetName: string, sheetId: str
         if (rows) {
             // Find the row with the correct info
 
-            const playerArray: Array<string> = [player.first_name, player.last_name, player.email, player.phone_no];
-            const rowIndex = rows.findIndex((row: Array<string>) => {
-                const PlayerExcelRows = row.slice(0, 4);
-                console.log(`PlayerExcelRows: ${PlayerExcelRows}`);
-                console.log(`playerArray: ${playerArray}`);
-                return _.isEqual(PlayerExcelRows, playerArray);
-            });
+            const rowIndex = await findRowIndexBasedOnPlayer(player, rows);
 
             if (rowIndex !== -1) {
                 // Delete the row
@@ -310,12 +319,35 @@ export async function deleteRow(player: IPlayer, sheetName: string, sheetId: str
                 console.log(`Deleted row: ${rowIndex + 1}`);
                 return deleteResponse;
             } else {
-                console.log(`No row found with player information: ${playerArray}`);
+                console.log(`No row found with player information: ${JSON.stringify(player, null, 2)}`);
             }
         } else {
             console.log(`No data found in sheet: ${sheetName}`);
         }
     } catch (error: Error | any) {
         console.error(error);
+    }
+}
+
+async function copyAndReplaceRow(sheetName: string, sourceRowIndex: number, player: IPlayer) {
+    try {
+        // Step 1: Read the row to be copied of the first player in the waiting list
+        const sourceRows = await getRow(sheetName, `A59`, `F59`);
+        if(!sourceRows) throw new Error(`First player in the waiting list row is empty`);
+        const rowIndex: number = await findRowIndexBasedOnPlayer(player, sourceRows);
+        // Step 2: Write the copied values to the target row
+        const writeRequest = {
+            spreadsheetId: process.env.spread_sheet_id,
+            range: `${sheetName}!A${rowIndex}:F${rowIndex}`, // Adjust the range as needed
+            valueInputOption: "RAW",
+            resource: {
+                values: sourceRows
+            }
+        };
+
+        await sheets.spreadsheets.values.update(writeRequest);
+        console.log(`Row copied from row of first player in the waiting list row 59 to ${rowIndex}`);
+    } catch (err: Error | any) {
+        console.error(`Failed to copy and replace row: ${err.message}`);
     }
 }
