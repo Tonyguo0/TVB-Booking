@@ -103,14 +103,14 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
         const playerArray: Array<string> = [playerDetailsArray[0], playerDetailsArray[1], playerDetailsArray[2], playerDetailsArray[3]];
         const paymentResponse = await createPayment(body.sourceId, customerId);
         // TODO: change this to a enviroment variable
-        if (rows.length == Number(process.env.MAX_PLAYERS)) {
+        if (rows.length == Number(process.env.MAX_PLAYERS) + 1) {
             // TODO: add a empty row then append the waiting list title after wards then append the players to waiting list after that
             // number of columns
             await appendRowToSheet(["replacementValue"], sheetName);
             await appendRowToSheet(["waiting list:"], sheetName);
-            await replaceValueInSheet(`${sheetName}!A57`, ` `);
+            await replaceValueInSheet(`${sheetName}!A58`, ` `);
             await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
-        } else if (rows.length < Number(process.env.MAX_PLAYERS)) {
+        } else if (rows.length < Number(process.env.MAX_PLAYERS) + 1) {
             await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
             // return paymentResponse here
             return paymentResponse;
@@ -134,7 +134,7 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
         throw new Error(`The API returned an error: ${err.message}`);
     }
 }
-async function getRow(sheetName: string, rowLetterFrom: string, rowLetterTo: string): Promise<string[][]> {
+export async function getRow(sheetName: string, rowLetterFrom: string, rowLetterTo: string): Promise<string[][]> {
     try {
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId: process.env.spread_sheet_id,
@@ -270,7 +270,7 @@ export async function getSheetId(sheetName: string) {
     return String(sheet?.properties?.sheetId);
 }
 
-async function findRowIndexBasedOnPlayer(player: IPlayer, rows: Array<Array<string>>): Promise<number> {
+export async function findRowIndexBasedOnPlayer(player: IPlayer, rows: Array<Array<string>>): Promise<number> {
     try {
         const playerArray: Array<string> = [player.first_name, player.last_name, player.email, player.phone_no];
         const rowIndex = rows.findIndex((row: Array<string>) => {
@@ -285,7 +285,7 @@ async function findRowIndexBasedOnPlayer(player: IPlayer, rows: Array<Array<stri
     }
 }
 
-export async function deleteRow(player: IPlayer, sheetName: string, sheetId: string) {
+export async function deleteRowBasedOnPlayer(player: IPlayer, sheetName: string, sheetId: string) {
     try {
         // Get the data from the sheet
         const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
@@ -329,11 +329,40 @@ export async function deleteRow(player: IPlayer, sheetName: string, sheetId: str
     }
 }
 
-async function copyAndReplaceRow(sheetName: string, sourceRowIndex: number, player: IPlayer) {
+export async function deleteRowBasedOnIndex(rowIndex: number, sheetName: string, sheetId: string) {
+    try {
+        const request = {
+            spreadsheetId: process.env.spread_sheet_id,
+            auth: auth,
+            resource: {
+                requests: [
+                    {
+                        deleteDimension: {
+                            range: {
+                                sheetId: sheetId,
+                                dimension: "ROWS",
+                                startIndex: rowIndex,
+                                endIndex: rowIndex + 1
+                            }
+                        }
+                    }
+                ]
+            }
+        };
+
+        const deleteResponse = await sheets.spreadsheets.batchUpdate(request);
+        console.log(`Deleted row: ${rowIndex + 1}`);
+        return deleteResponse;
+    } catch (error: Error | any) {
+        console.error(error);
+    }
+}
+
+export async function copyAndReplaceRow(player: IPlayer, sheetName: string) {
     try {
         // Step 1: Read the row to be copied of the first player in the waiting list
-        const sourceRows = await getRow(sheetName, `A59`, `F59`);
-        if(!sourceRows) throw new Error(`First player in the waiting list row is empty`);
+        const sourceRows = await getRow(sheetName, `A${process.env.MAX_PLAYERS! + 4}`, `F${process.env.MAX_PLAYERS! + 4}`);
+        if (!sourceRows) throw new Error(`First player in the waiting list row is empty`);
         const rowIndex: number = await findRowIndexBasedOnPlayer(player, sourceRows);
         // Step 2: Write the copied values to the target row
         const writeRequest = {
@@ -346,8 +375,21 @@ async function copyAndReplaceRow(sheetName: string, sourceRowIndex: number, play
         };
 
         await sheets.spreadsheets.values.update(writeRequest);
-        console.log(`Row copied from row of first player in the waiting list row 59 to ${rowIndex}`);
+        console.log(`Row copied from row of first player in the waiting list row ${process.env.MAX_PLAYERS! + 4} to ${rowIndex}`);
     } catch (err: Error | any) {
         console.error(`Failed to copy and replace row: ${err.message}`);
+    }
+}
+
+export async function getNumberOfRows(sheetName: string): Promise<number> {
+    try {
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId: process.env.spread_sheet_id,
+            auth: auth,
+            range: `${sheetName}!A:A`
+        });
+        return response.data.values?.length!;
+    } catch (err: Error | any) {
+        throw new Error(`getNumberOfRows function returned an error: ${err.message}`);
     }
 }
