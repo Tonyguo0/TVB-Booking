@@ -4,6 +4,7 @@ import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreatePaymentResponse, Environment, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
 import { checkAndAddRowToSheet, checkAndAppendIfSundayExists, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
+import { MAX_PLAYERS } from "./utils/utils";
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
     interface BigInt {
@@ -85,7 +86,7 @@ payController.post(
     async ({ body, set }) => {
         try {
             console.log(`Create body payment = `);
-            console.log(JSON.stringify(body));
+            // console.log(JSON.stringify(body));
             // add a new sheet if this week's sunday's date isn't a sheet name
             const sheetName = await checkAndAppendIfSundayExists();
             console.log(`sheetName = ${sheetName}`);
@@ -133,7 +134,6 @@ payController.post(
     async ({ body, set }) => {
         try {
             const player: IPlayer = body.player;
-            console.log(`hello from refund payment`);
             // add a new sheet if this week's sunday's date isn't a sheet name
             const sheetName = await checkAndAppendIfSundayExists();
             console.log(`sheetName = ${sheetName}`);
@@ -152,28 +152,32 @@ payController.post(
             });
             set.status = 201;
             set.headers["Content-Type"] = "application/json";
-            console.log(response.result.refund);
+            console.log(`refunded response = ${JSON.stringify(response.result.refund, null, 2)}`);
 
             if (response != null && response.body != null && response.result?.refund?.status == `PENDING`) {
                 const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
                 const playerIndex: number = await findRowIndexBasedOnPlayer(player, rows);
-
+                console.log(`playerIndex = ${playerIndex}`);
+                // TODO: need to test this
                 // TODO: might need to take the outer if since we want to check if there is a waiting list first or not
-                if (playerIndex > Number(process.env.MAX_PLAYER) + 1) {
-                    // if refunded player is in the waiting list, delete the player from the waiting list
+
+                const sheetRowNum: number = await getNumberOfRows(sheetName);
+                // row of where waiting list title starts
+                if (sheetRowNum <= MAX_PLAYERS + 3) {
+                    // if number of players doesn't exceed max player limit, delete the player from the sheet
+                    // aka: no waiting list
                     await deleteRowBasedOnPlayer(player, sheetName, sheetId);
                 } else {
-                    const sheetRowNum: number = await getNumberOfRows(sheetName);
-                    if (sheetRowNum <= Number(process.env.MAX_PLAYER) + 1) {
-                        // if number of players doesn't exceed max player limit, delete the player from the sheet
+                    // aka: there is a waiting list
+                    if (playerIndex > MAX_PLAYERS+1) {
+                        // if refunded player is in the waiting list, delete the player from the waiting list
                         await deleteRowBasedOnPlayer(player, sheetName, sheetId);
                     } else {
                         // if number of player does exceed max player limit, replace the player with the next player in the waiting list
-
                         // copyAndReplaceRow() : replace the row which the player was refunded from with the next player in the waiting list
                         // deleteRow(): delete the row of the player who was refunded
                         await copyAndReplaceRow(player, sheetName);
-                        await deleteRowBasedOnIndex(Number(process.env.MAX_PLAYER) + 4, sheetName, sheetId);
+                        await deleteRowBasedOnIndex(MAX_PLAYERS + 4, sheetName, sheetId);
                     }
                 }
             }

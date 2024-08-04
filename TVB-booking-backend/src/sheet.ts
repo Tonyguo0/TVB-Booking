@@ -4,7 +4,7 @@ import path from "path";
 import { IcreatePaybody } from "./model/createPayBody";
 import { IPlayer } from "./model/player";
 import { createPayment } from "./pay";
-import { getThisWeekSunday } from "./utils/utils";
+import { getThisWeekSunday, MAX_PLAYERS } from "./utils/utils";
 
 const auth = new google.auth.GoogleAuth({
     keyFile: path.join(import.meta.dir, `../`, `google-cred.json`),
@@ -119,16 +119,7 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
             await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
             // return paymentResponse here
         }
-        // for (const row of rows) {
-        //     console.log(`row:`);
-        //     console.log(row);
-        //     console.log(`playerArray:`);
-        //     console.log(playerArray);
-        //     if (_.isEqual(row, playerArray)) {
-        //         return true;
-        //     }
-        // }
-        // TODO: true represents player on waiitng list
+        // TODO: true represents player on waiting list
         return true;
     } catch (err: Error | any) {
         throw new Error(`The API returned an error: ${err.message}`);
@@ -329,6 +320,41 @@ export async function deleteRowBasedOnPlayer(player: IPlayer, sheetName: string,
     }
 }
 
+export async function clearRowBasedOnPlayer(player: IPlayer, sheetName: string, sheetId: string) {
+    try {
+        // Get the data from the sheet
+        const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
+        if (rows) {
+            // Find the row with the correct info
+
+            const rowIndex = await findRowIndexBasedOnPlayer(player, rows);
+
+            if (rowIndex !== -1) {
+                // Delete the row
+                const request = {
+                    spreadsheetId: process.env.spread_sheet_id,
+                    auth: auth,
+                    range: `${sheetName}!${rowIndex + 1}:${rowIndex + 1}`,
+                    valueInputOption: "RAW",
+                    resource: {
+                        values: [[``, ``, ``, ``, ``, ``]]
+                    }
+                };
+
+                const Response = await sheets.spreadsheets.values.update(request);
+                console.log(`Cleared row: ${rowIndex + 1}`);
+                return Response;
+            } else {
+                console.log(`No row found with player information: ${JSON.stringify(player, null, 2)}`);
+            }
+        } else {
+            console.log(`No data found in sheet: ${sheetName}`);
+        }
+    } catch (error: Error | any) {
+        console.error(error);
+    }
+}
+
 export async function deleteRowBasedOnIndex(rowIndex: number, sheetName: string, sheetId: string) {
     try {
         const request = {
@@ -341,17 +367,17 @@ export async function deleteRowBasedOnIndex(rowIndex: number, sheetName: string,
                             range: {
                                 sheetId: sheetId,
                                 dimension: "ROWS",
-                                startIndex: rowIndex,
-                                endIndex: rowIndex + 1
+                                startIndex: rowIndex - 1,
+                                endIndex: rowIndex
                             }
                         }
                     }
                 ]
             }
         };
-
+        console.log(`Deleting row: ${rowIndex}`);
         const deleteResponse = await sheets.spreadsheets.batchUpdate(request);
-        console.log(`Deleted row: ${rowIndex + 1}`);
+        console.log(`Deleted row: ${rowIndex}`);
         return deleteResponse;
     } catch (error: Error | any) {
         console.error(error);
@@ -361,23 +387,26 @@ export async function deleteRowBasedOnIndex(rowIndex: number, sheetName: string,
 export async function copyAndReplaceRow(player: IPlayer, sheetName: string) {
     try {
         // Step 1: Read the row to be copied of the first player in the waiting list
-        const sourceRows = await getRow(sheetName, `A${process.env.MAX_PLAYERS! + 4}`, `F${process.env.MAX_PLAYERS! + 4}`);
-        if (!sourceRows) throw new Error(`First player in the waiting list row is empty`);
-        const rowIndex: number = await findRowIndexBasedOnPlayer(player, sourceRows);
+        const RowToBeReplaced: Array<Array<string>> = await getRow(sheetName, `A${MAX_PLAYERS + 4}`, `F${MAX_PLAYERS + 4}`);
+        if (!RowToBeReplaced) throw new Error(`Row to be replaced is empty in copyAndReplaceRow()`);
+        const playerRow = await getRow(sheetName, `A`, `D`);
+        if (!playerRow) throw new Error(`Player row is empty in copyAndReplaceRow()`);
+        const rowIndex: number = await findRowIndexBasedOnPlayer(player, playerRow);
         // Step 2: Write the copied values to the target row
         const writeRequest = {
             spreadsheetId: process.env.spread_sheet_id,
-            range: `${sheetName}!A${rowIndex}:F${rowIndex}`, // Adjust the range as needed
+            auth: auth,
+            range: `${sheetName}!A${rowIndex + 1}:F${rowIndex + 1}`, // Adjust the range as needed
             valueInputOption: "RAW",
             resource: {
-                values: sourceRows
+                values: RowToBeReplaced
             }
         };
 
         await sheets.spreadsheets.values.update(writeRequest);
-        console.log(`Row copied from row of first player in the waiting list row ${process.env.MAX_PLAYERS! + 4} to ${rowIndex}`);
+        console.log(`Row copied from row of first player in the waiting list row ${MAX_PLAYERS + 4} to ${rowIndex}`);
     } catch (err: Error | any) {
-        console.error(`Failed to copy and replace row: ${err.message}`);
+        console.error(`Failed to copy and replace row: ${err}`);
     }
 }
 
