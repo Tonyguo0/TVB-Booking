@@ -102,15 +102,17 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
         // TODO: figure out what this is for?
         const playerArray: Array<string> = [playerDetailsArray[0], playerDetailsArray[1], playerDetailsArray[2], playerDetailsArray[3]];
         const paymentResponse = await createPayment(body.sourceId, customerId);
+        const numOfRows = await getNumberOfRows(sheetName);
+        console.log(`numOfRows = ${numOfRows}`);
         // TODO: change this to a enviroment variable
-        if (rows.length == Number(process.env.MAX_PLAYERS) + 1) {
+        if (numOfRows === MAX_PLAYERS + 1) {
             // TODO: add a empty row then append the waiting list title after wards then append the players to waiting list after that
             // number of columns
             await appendRowToSheet(["replacementValue"], sheetName);
             await appendRowToSheet(["waiting list:"], sheetName);
-            await replaceValueInSheet(`${sheetName}!A58`, ` `);
+            await replaceValueInSheet(`${sheetName}!A${MAX_PLAYERS + 2}`, ` `);
             await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
-        } else if (rows.length < Number(process.env.MAX_PLAYERS) + 1) {
+        } else if (numOfRows < MAX_PLAYERS + 1) {
             await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
             // return paymentResponse here
             return paymentResponse;

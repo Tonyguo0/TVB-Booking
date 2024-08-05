@@ -169,15 +169,22 @@ payController.post(
                     await deleteRowBasedOnPlayer(player, sheetName, sheetId);
                 } else {
                     // aka: there is a waiting list
-                    if (playerIndex > MAX_PLAYERS+1) {
+                    if (playerIndex > MAX_PLAYERS + 1) {
                         // if refunded player is in the waiting list, delete the player from the waiting list
                         await deleteRowBasedOnPlayer(player, sheetName, sheetId);
                     } else {
                         // if number of player does exceed max player limit, replace the player with the next player in the waiting list
                         // copyAndReplaceRow() : replace the row which the player was refunded from with the next player in the waiting list
                         // deleteRow(): delete the row of the player who was refunded
+
                         await copyAndReplaceRow(player, sheetName);
                         await deleteRowBasedOnIndex(MAX_PLAYERS + 4, sheetName, sheetId);
+                    }
+                    if (sheetRowNum === MAX_PLAYERS + 4) {
+                        // if the number of players is equal to the max player limit, delete waiting list title and the replacement row
+                        // has to be deleted in this order as the rows shift up when a row is deleted 
+                        await deleteRowBasedOnIndex(MAX_PLAYERS + 3, sheetName, sheetId);
+                        await deleteRowBasedOnIndex(MAX_PLAYERS + 2, sheetName, sheetId);
                     }
                 }
             }
