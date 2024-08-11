@@ -278,6 +278,37 @@ export async function findRowIndexBasedOnPlayer(player: IPlayer, rows: Array<Arr
     }
 }
 
+export async function deleteRows(startIndex: number, endIndex: number, sheetId: string) {
+    try {
+        // Get the data from the sheet
+        // Delete the row
+        const request = {
+            spreadsheetId: process.env.spread_sheet_id,
+            auth: auth,
+            resource: {
+                requests: [
+                    {
+                        deleteDimension: {
+                            range: {
+                                sheetId: sheetId,
+                                dimension: "ROWS",
+                                startIndex: startIndex,
+                                endIndex: endIndex + 1
+                            }
+                        }
+                    }
+                ]
+            }
+        };
+
+        const deleteResponse = await sheets.spreadsheets.batchUpdate(request);
+        console.log(`Deleted rows: ${startIndex} to ${endIndex + 1}`);
+        return deleteResponse;
+    } catch (error: Error | any) {
+        console.error(error);
+    }
+}
+
 export async function deleteRowBasedOnPlayer(player: IPlayer, sheetName: string, sheetId: string) {
     try {
         // Get the data from the sheet
@@ -289,27 +320,8 @@ export async function deleteRowBasedOnPlayer(player: IPlayer, sheetName: string,
 
             if (rowIndex !== -1) {
                 // Delete the row
-                const request = {
-                    spreadsheetId: process.env.spread_sheet_id,
-                    auth: auth,
-                    resource: {
-                        requests: [
-                            {
-                                deleteDimension: {
-                                    range: {
-                                        sheetId: sheetId,
-                                        dimension: "ROWS",
-                                        startIndex: rowIndex,
-                                        endIndex: rowIndex + 1
-                                    }
-                                }
-                            }
-                        ]
-                    }
-                };
-
-                const deleteResponse = await sheets.spreadsheets.batchUpdate(request);
-                console.log(`Deleted row: ${rowIndex + 1}`);
+                // TODO: deal with typing of variables
+                const deleteResponse = await deleteRows(rowIndex, rowIndex + 1, sheetId);
                 return deleteResponse;
             } else {
                 console.log(`No row found with player information: ${JSON.stringify(player, null, 2)}`);

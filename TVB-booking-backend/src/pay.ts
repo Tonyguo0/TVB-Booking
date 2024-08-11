@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreatePaymentResponse, Environment, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
-import { checkAndAddRowToSheet, checkAndAppendIfSundayExists, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
+import { checkAndAddRowToSheet, checkAndAppendIfSundayExists, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, deleteRows, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
 import { MAX_PLAYERS } from "./utils/utils";
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
@@ -182,7 +182,7 @@ payController.post(
                     }
                     if (sheetRowNum === MAX_PLAYERS + 4) {
                         // if the number of players is equal to the max player limit, delete waiting list title and the replacement row
-                        // has to be deleted in this order as the rows shift up when a row is deleted 
+                        // has to be deleted in this order as the rows shift up when a row is deleted
                         await deleteRowBasedOnIndex(MAX_PLAYERS + 3, sheetName, sheetId);
                         await deleteRowBasedOnIndex(MAX_PLAYERS + 2, sheetName, sheetId);
                     }
@@ -203,13 +203,20 @@ payController.post(
 // Schedule a task to run at a specific date and time
 // The cron syntax is 'second minute hour day month dayOfWeek'
 // This will run at 00:00:00 on December 31
+// TODO: MAKE SURE THE GOOGLE SHEET EXIST FIRST BEFORE RUNNING THIS
 const job = new CronJob(
     // seconds, minutes, hours, day of month, month, day of week
-    "00 11 22 09 06 *",
-    () => {
+    "00 11 22 10 08 *",
+    async () => {
         try {
+            const sheetName = await checkAndAppendIfSundayExists();
+            console.log(`sheetName = ${sheetName}`);
             // working!!!
-            // Replace this with the actual logic to refund the payment
+            // TODO: Replace this with the actual logic to refund the payment
+            // TODO: DELETE all waiting list players and REFUND THEM
+
+            const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
+            deleteRows(MAX_PLAYERS + 4, MAX_PLAYERS + 104, sheetName);
             console.log(`hello from cron job`);
         } catch (err) {
             console.error(err);
