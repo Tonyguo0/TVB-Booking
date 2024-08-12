@@ -4,7 +4,7 @@ import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreatePaymentResponse, Environment, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
 import { checkAndAddRowToSheet, checkAndAppendIfSundayExists, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, deleteRows, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
-import { MAX_PLAYERS } from "./utils/utils";
+import { MAX_PLAYERS, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
     interface BigInt {
@@ -212,11 +212,32 @@ const job = new CronJob(
             const sheetName = await checkAndAppendIfSundayExists();
             console.log(`sheetName = ${sheetName}`);
             // working!!!
+            const sheetId: string = await getSheetId(sheetName);
+            console.log(`sheetId = ${sheetId}`);
             // TODO: Replace this with the actual logic to refund the payment
+            // TODO: Get all Player in the waiting list
+            const RowsToBeReplaced: Array<Array<string>> = await getRow(sheetName, `A${MAX_PLAYERS + 4}`, `F${MAX_PLAYERS + 4 + WAITING_LIST_PLAYER_AMOUNT}`);
+            // TODO REFUND them
+            for (const row of RowsToBeReplaced) {
+                if (!row && !row[0]) break;
+                let payId = row[4];
+                const response: ApiResponse<RefundPaymentResponse> = await refundsApi.refundPayment({
+                    idempotencyKey: randomUUID(),
+                    amountMoney: {
+                        amount: BigInt(100),
+                        currency: `AUD`
+                    },
+                    paymentId: payId,
+                    reason: `requested_by_customer`
+                });
+                if (response != null && response.body != null && response.result?.refund?.status == `PENDING`) {
+                    // delete the player from the waiting list
+                    await deleteRowBasedOnPlayer({ first_name: row[0], last_name: row[1], email: row[2], phone_no: row[3] }, sheetName, sheetId);
+                } else {
+                    console.error(`Refund failed for ${row[0]} ${row[1]} ${row[2]} ${row[3]}`);
+                }
+            }
             // TODO: DELETE all waiting list players and REFUND THEM
-
-            const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
-            deleteRows(MAX_PLAYERS + 4, MAX_PLAYERS + 104, sheetName);
             console.log(`hello from cron job`);
         } catch (err) {
             console.error(err);
