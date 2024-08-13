@@ -200,7 +200,6 @@ export async function getSheetTitle(): Promise<string> {
             throw new Error(`could not get sheet data from google API spreadsheets`);
         }
         const latestSheet: string = sheet?.[sheet?.length - 1].properties?.title!;
-        console.log(sheets);
         console.log(`latest sheet is: ${latestSheet}`);
         return latestSheet;
     } catch (error: Error | any) {

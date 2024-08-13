@@ -206,20 +206,24 @@ payController.post(
 // TODO: MAKE SURE THE GOOGLE SHEET EXIST FIRST BEFORE RUNNING THIS
 const job = new CronJob(
     // seconds, minutes, hours, day of month, month, day of week
-    "00 11 22 10 08 *",
+    "00 00 18 * * 7",
     async () => {
         try {
             const sheetName = await checkAndAppendIfSundayExists();
             console.log(`sheetName = ${sheetName}`);
-            // working!!!
+
             const sheetId: string = await getSheetId(sheetName);
             console.log(`sheetId = ${sheetId}`);
-            // TODO: Replace this with the actual logic to refund the payment
-            // TODO: Get all Player in the waiting list
-            const RowsToBeReplaced: Array<Array<string>> = await getRow(sheetName, `A${MAX_PLAYERS + 4}`, `F${MAX_PLAYERS + 4 + WAITING_LIST_PLAYER_AMOUNT}`);
-            // TODO REFUND them
+
+            const RowsToBeReplaced: Array<Array<string>> | undefined = await getRow(sheetName, `A${MAX_PLAYERS + 4}`, `F${MAX_PLAYERS + 4 + WAITING_LIST_PLAYER_AMOUNT}`);
+            if (RowsToBeReplaced == null) {
+                console.log(`No players in the waiting list`);
+                return;
+            }
+            
             for (const row of RowsToBeReplaced) {
                 if (!row && !row[0]) break;
+                console.log(`row = ${row}`);
                 let payId = row[4];
                 const response: ApiResponse<RefundPaymentResponse> = await refundsApi.refundPayment({
                     idempotencyKey: randomUUID(),
@@ -232,13 +236,12 @@ const job = new CronJob(
                 });
                 if (response != null && response.body != null && response.result?.refund?.status == `PENDING`) {
                     // delete the player from the waiting list
+                    console.log(`refund response: ${JSON.stringify(response.result, null, 2)}`);
                     await deleteRowBasedOnPlayer({ first_name: row[0], last_name: row[1], email: row[2], phone_no: row[3] }, sheetName, sheetId);
                 } else {
                     console.error(`Refund failed for ${row[0]} ${row[1]} ${row[2]} ${row[3]}`);
                 }
             }
-            // TODO: DELETE all waiting list players and REFUND THEM
-            console.log(`hello from cron job`);
         } catch (err) {
             console.error(err);
         }
