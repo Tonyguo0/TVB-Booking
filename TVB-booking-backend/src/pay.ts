@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreatePaymentResponse, Environment, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
-import { checkAndAddRowToSheet, checkAndAppendIfSundayExists, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, deleteRows, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
+import { checkAndAddRowToSheet, checkAndAppendIfSundayExists, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
 import { MAX_PLAYERS, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
@@ -203,7 +203,6 @@ payController.post(
 // Schedule a task to run at a specific date and time
 // The cron syntax is 'second minute hour day month dayOfWeek'
 // This will run at 00:00:00 on December 31
-// TODO: MAKE SURE THE GOOGLE SHEET EXIST FIRST BEFORE RUNNING THIS
 const job = new CronJob(
     // seconds, minutes, hours, day of month, month, day of week
     "00 00 18 * * 7",
@@ -220,7 +219,7 @@ const job = new CronJob(
                 console.log(`No players in the waiting list`);
                 return;
             }
-            
+
             for (const row of RowsToBeReplaced) {
                 if (!row && !row[0]) break;
                 console.log(`row = ${row}`);
@@ -242,6 +241,10 @@ const job = new CronJob(
                     console.error(`Refund failed for ${row[0]} ${row[1]} ${row[2]} ${row[3]}`);
                 }
             }
+
+            // need to delete the waiting list title aswell
+            await deleteRowBasedOnIndex(MAX_PLAYERS + 3, sheetName, sheetId);
+            await deleteRowBasedOnIndex(MAX_PLAYERS + 2, sheetName, sheetId);
         } catch (err) {
             console.error(err);
         }
