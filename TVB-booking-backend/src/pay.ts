@@ -4,7 +4,7 @@ import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreatePaymentResponse, Environment, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
 import { checkAndAddRowToSheet, checkAndAppendIfSundayExists, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
-import { MAX_PLAYERS, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
+import { LOCATION_ID, MAX_PLAYERS, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
     interface BigInt {
@@ -17,7 +17,7 @@ BigInt.prototype.toJSON = function () {
     return this.toString();
 };
 
-const { paymentsApi, customersApi, refundsApi } = new Client({
+const { paymentsApi, customersApi, refundsApi, ordersApi } = new Client({
     accessToken: process.env.SQUARE_ACCESS_TOKEN,
     environment: Environment.Sandbox
 });
@@ -71,10 +71,30 @@ export async function createPayment(sourceId: string, CustomerId: string) {
             },
             customerId: CustomerId
         });
-        // TODO: need to add this somewhere
+        // TODO: Test this:
+        await ordersApi.createOrder({
+            order: {
+                locationId: LOCATION_ID,
+                lineItems: [
+                    {
+                        quantity: "1",
+                        catalogObjectId: "Y3QYAB4OIOW2FEEFKGE35PQP",
+                        itemType: "ITEM"
+                    }
+                ],
+                discounts: [{}]
+            }
+        });
+        // TODO: ITEMID: CIJMPF2RMDRBURW4XUSHLTTO
+        // TODO: ITEM_VARIATION_ID: Y3QYAB4OIOW2FEEFKGE35PQP
         //
         if (response == null || response.result == null || response.result.payment?.status != `COMPLETED`) throw new Error(`Payment not completed: ${JSON.stringify(response, null, 2)}`);
         console.log(`payment successful!!`);
+        // Payment.status
+        // APPROVED. The payment is authorized and awaiting completion or cancellation.
+        // COMPLETED. The payment is captured and funds are credited to the seller.
+        // CANCELED. The payment is canceled and the payment card funds are released.
+        // FAILED. The payment request is declined by the bank.
         return response;
     } catch (err) {
         throw err;

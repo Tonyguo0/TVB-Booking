@@ -1,5 +1,6 @@
 export const MAX_PLAYERS: number = Number(getEnv(process.env.MAX_PLAYERS!));
 export const WAITING_LIST_PLAYER_AMOUNT: number = Number(getEnv(process.env.WAITING_LIST_PLAYER_AMOUNT!));
+export const LOCATION_ID: string = getEnv(process.env.LOCATION_ID!);
 
 export async function getThisWeekSunday(): Promise<string> {
     const today = new Date();
