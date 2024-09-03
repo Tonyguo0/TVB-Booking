@@ -1,7 +1,7 @@
 import { CronJob } from "cron";
 import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
-import { ApiResponse, Client, CreatePaymentResponse, Environment, RefundPaymentResponse } from "square";
+import { ApiResponse, Client, CreateOrderResponse, CreatePaymentResponse, Environment, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
 import { checkAndAddRowToSheet, checkAndAppendIfSundayExists, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
 import { LOCATION_ID, MAX_PLAYERS, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
@@ -67,34 +67,49 @@ export async function createPayment(sourceId: string, CustomerId: string) {
             sourceId: sourceId,
             amountMoney: {
                 currency: `AUD`,
-                amount: BigInt(100)
+                amount: BigInt(1500)
             },
             customerId: CustomerId
         });
-        // TODO: Test this:
-        await ordersApi.createOrder({
-            order: {
-                locationId: LOCATION_ID,
-                lineItems: [
-                    {
-                        quantity: "1",
-                        catalogObjectId: "Y3QYAB4OIOW2FEEFKGE35PQP",
-                        itemType: "ITEM"
-                    }
-                ],
-                discounts: [{}]
-            }
-        });
-        // TODO: ITEMID: CIJMPF2RMDRBURW4XUSHLTTO
-        // TODO: ITEM_VARIATION_ID: Y3QYAB4OIOW2FEEFKGE35PQP
-        //
-        if (response == null || response.result == null || response.result.payment?.status != `COMPLETED`) throw new Error(`Payment not completed: ${JSON.stringify(response, null, 2)}`);
+
+        if (response == null || response.result == null || response.result.payment?.status != `COMPLETED`) {
+            throw new Error(`Payment not completed: ${JSON.stringify(response, null, 2)}`);
+        }
         console.log(`payment successful!!`);
+
         // Payment.status
         // APPROVED. The payment is authorized and awaiting completion or cancellation.
         // COMPLETED. The payment is captured and funds are credited to the seller.
         // CANCELED. The payment is canceled and the payment card funds are released.
         // FAILED. The payment request is declined by the bank.
+        return response;
+    } catch (err) {
+        throw err;
+    }
+}
+
+export async function createOrder() {
+    try {
+        // TODO: Test this:
+        const response: ApiResponse<CreateOrderResponse> = await ordersApi.createOrder({
+            order: {
+                locationId: LOCATION_ID,
+                lineItems: [
+                    {
+                        quantity: "1",
+                        // TODO: change this to environment variable ITEM_VARIATION_ID
+                        catalogObjectId: "Y3QYAB4OIOW2FEEFKGE35PQP",
+                        itemType: "ITEM"
+                    }
+                ]
+            }
+        });
+        // TODO: ITEMID: CIJMPF2RMDRBURW4XUSHLTTO
+        // TODO: ITEM_VARIATION_ID: Y3QYAB4OIOW2FEEFKGE35PQP
+        console.log(`order created ${JSON.stringify(response, null, 2)}`);
+        console.log(response?.result?.order?.id);
+        console.log(response?.result?.order?.totalMoney?.amount);
+
         return response;
     } catch (err) {
         throw err;
