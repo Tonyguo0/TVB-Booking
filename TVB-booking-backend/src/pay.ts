@@ -1,7 +1,7 @@
 import { CronJob } from "cron";
 import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
-import { ApiResponse, Client, CreateOrderResponse, CreatePaymentResponse, Environment, RefundPaymentResponse } from "square";
+import { ApiResponse, Client, CreateOrderResponse, CreatePaymentResponse, Environment, Order, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
 import { checkAndAddRowToSheet, checkAndAppendIfSundayExists, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
 import { LOCATION_ID, MAX_PLAYERS, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
@@ -62,6 +62,8 @@ export async function addNonDuplicateCustomer(player: IPlayer): Promise<string> 
 
 export async function createPayment(sourceId: string, CustomerId: string) {
     try {
+        const createOrderResponse: Order = await createOrder();
+
         const response: ApiResponse<CreatePaymentResponse> = await paymentsApi.createPayment({
             idempotencyKey: randomUUID(),
             sourceId: sourceId,
@@ -89,6 +91,37 @@ export async function createPayment(sourceId: string, CustomerId: string) {
 }
 
 export async function createOrder() {
+    try {
+        // TODO: Test this:
+        const response: ApiResponse<CreateOrderResponse> = await ordersApi.createOrder({
+            order: {
+                locationId: LOCATION_ID,
+                lineItems: [
+                    {
+                        quantity: "1",
+                        // TODO: change this to environment variable ITEM_VARIATION_ID
+                        catalogObjectId: "Y3QYAB4OIOW2FEEFKGE35PQP",
+                        itemType: "ITEM"
+                    }
+                ]
+            }
+        });
+        // TODO: ITEMID: CIJMPF2RMDRBURW4XUSHLTTO
+        // TODO: ITEM_VARIATION_ID: Y3QYAB4OIOW2FEEFKGE35PQP
+        console.log(`order created ${JSON.stringify(response, null, 2)}`);
+        console.log(response?.result?.order?.id);
+        console.log(response?.result?.order?.totalMoney?.amount);
+        if (response != null && response.result != null && response.result.order != null) {
+            return response.result.order;
+        } else {
+            throw new Error(`Order not created: ${JSON.stringify(response, null, 2)}`);
+        }
+    } catch (err) {
+        throw err;
+    }
+}
+
+export async function payForOrder() {
     try {
         // TODO: Test this:
         const response: ApiResponse<CreateOrderResponse> = await ordersApi.createOrder({

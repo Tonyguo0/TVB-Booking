@@ -1,6 +1,6 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
-import { payController } from "./pay";
+import { createOrder, payController } from "./pay";
 const app = new Elysia({ prefix: `/api` });
 
 app.use(
@@ -26,7 +26,7 @@ app.get("/test", async () => {
     //     email: "testemail@gmail.com",
     //     phone_no: "0438982888"
     // });
-    // await createOrder();
+    await createOrder();
 });
 
 app.listen(3000, () => {
