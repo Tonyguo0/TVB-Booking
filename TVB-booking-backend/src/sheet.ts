@@ -292,7 +292,7 @@ export async function deleteRows(startIndex: number, endIndex: number, sheetId: 
                                 sheetId: sheetId,
                                 dimension: "ROWS",
                                 startIndex: startIndex,
-                                endIndex: endIndex + 1
+                                endIndex: endIndex
                             }
                         }
                     }
@@ -301,7 +301,7 @@ export async function deleteRows(startIndex: number, endIndex: number, sheetId: 
         };
 
         const deleteResponse = await sheets.spreadsheets.batchUpdate(request);
-        console.log(`Deleted rows: ${startIndex} to ${endIndex + 1}`);
+        console.log(`Deleted rows: ${startIndex} to ${endIndex}`);
         return deleteResponse;
     } catch (error: Error | any) {
         console.error(error);

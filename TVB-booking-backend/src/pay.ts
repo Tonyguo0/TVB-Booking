@@ -4,7 +4,7 @@ import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreateOrderResponse, CreatePaymentResponse, Environment, Order, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
 import { checkAndAddRowToSheet, checkAndAppendIfSundayExists, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
-import { LOCATION_ID, MAX_PLAYERS, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
+import { ITEM_VARIATION_ID, LOCATION_ID, MAX_PLAYERS, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
     interface BigInt {
@@ -63,13 +63,16 @@ export async function addNonDuplicateCustomer(player: IPlayer): Promise<string> 
 export async function createPayment(sourceId: string, CustomerId: string) {
     try {
         const createOrderResponse: Order = await createOrder();
-
+        if (createOrderResponse == null || createOrderResponse.id == null || createOrderResponse.totalMoney == null) {
+            throw new Error(`Error creating order in createPayment: ${JSON.stringify(createOrderResponse, null, 2)}`);
+        }
         const response: ApiResponse<CreatePaymentResponse> = await paymentsApi.createPayment({
             idempotencyKey: randomUUID(),
             sourceId: sourceId,
+            orderId: createOrderResponse.id,
             amountMoney: {
                 currency: `AUD`,
-                amount: BigInt(1500)
+                amount: createOrderResponse.totalMoney.amount
             },
             customerId: CustomerId
         });
@@ -77,6 +80,7 @@ export async function createPayment(sourceId: string, CustomerId: string) {
         if (response == null || response.result == null || response.result.payment?.status != `COMPLETED`) {
             throw new Error(`Payment not completed: ${JSON.stringify(response, null, 2)}`);
         }
+        console.log(`${JSON.stringify(response, null, 2)}`);
         console.log(`payment successful!!`);
 
         // Payment.status
@@ -99,15 +103,12 @@ export async function createOrder() {
                 lineItems: [
                     {
                         quantity: "1",
-                        // TODO: change this to environment variable ITEM_VARIATION_ID
-                        catalogObjectId: "Y3QYAB4OIOW2FEEFKGE35PQP",
+                        catalogObjectId: ITEM_VARIATION_ID,
                         itemType: "ITEM"
                     }
                 ]
             }
         });
-        // TODO: ITEMID: CIJMPF2RMDRBURW4XUSHLTTO
-        // TODO: ITEM_VARIATION_ID: Y3QYAB4OIOW2FEEFKGE35PQP
         console.log(`order created ${JSON.stringify(response, null, 2)}`);
         console.log(response?.result?.order?.id);
         console.log(response?.result?.order?.totalMoney?.amount);
