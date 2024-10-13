@@ -29,6 +29,43 @@ async function appendRowToSheet(response: Array<string>, sheetName: string) {
     }
 }
 
+async function makeBold(sheetId: string, rowIndex: number) {
+    const request = {
+        spreadsheetId: process.env.spread_sheet_id,
+        auth: auth,
+        resource: {
+            requests: [
+                {
+                    repeatCell: {
+                        range: {
+                            sheetId: sheetId,
+                            startRowIndex: rowIndex,
+                            endRowIndex: rowIndex + 1,
+                            startColumnIndex: 0,
+                            endColumnIndex: 6
+                        },
+                        cell: {
+                            userEnteredFormat: {
+                                textFormat: {
+                                    bold: true
+                                }
+                            }
+                        },
+                        fields: "userEnteredFormat.textFormat.bold"
+                    }
+                }
+            ]
+        }
+    };
+
+    try {
+        await sheets.spreadsheets.batchUpdate(request);
+        console.log(`Row ${rowIndex} is now bold`);
+    } catch (err: Error | any) {
+        console.error(`Failed to make row bold: ${err.message}`);
+    }
+}
+
 async function replaceValueInSheet(range: string, replacementValue: string) {
     try {
         const sheets = google.sheets({ version: "v4", auth: auth });
@@ -104,24 +141,29 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
         const paymentResponse = await createPayment(body.sourceId, customerId);
         const numOfRows = await getNumberOfRows(sheetName);
         console.log(`numOfRows = ${numOfRows}`);
-        // TODO: change this to a enviroment variable
+        
         if (numOfRows === MAX_PLAYERS + 1) {
+            // Append waiting list title and add the player to the waiting list
             // TODO: add a empty row then append the waiting list title after wards then append the players to waiting list after that
             // number of columns
             await appendRowToSheet(["replacementValue"], sheetName);
             await appendRowToSheet(["waiting list:"], sheetName);
+            // TODO: add this sheetId else where e.g. checkAndAppendIfSundayExists()
+            const sheetId = await getSheetId(sheetName);
+            // TODO: check if this is correct
+            await makeBold(sheetId, MAX_PLAYERS + 2);
             await replaceValueInSheet(`${sheetName}!A${MAX_PLAYERS + 2}`, ` `);
             await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
         } else if (numOfRows < MAX_PLAYERS + 1) {
+            // Append the player for the game
             await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
             // return paymentResponse here
             return paymentResponse;
         } else {
-            // console.log(`paymentResponse = ${JSON.stringify(paymentResponse, null, 2)}`);
+            // Append the player for the waiting list
             await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
-            // return paymentResponse here
         }
-        // TODO: true represents player on waiting list
+        // true represents player on waiting list
         return true;
     } catch (err: Error | any) {
         throw new Error(`The API returned an error: ${err.message}`);
@@ -217,8 +259,11 @@ export async function checkAndAppendIfSundayExists(): Promise<string> {
     } else {
         console.log(`adding a new sheet called ${thisSunday}`);
         await addSheets(thisSunday);
+        // Add the title of the columns
         //TODO: need to make the responses bold
         await appendRowToSheet(["First Name", "Last Name", "Email", "Phone Number", "Pay ID", "Paid?"], thisSunday);
+        const sheetId = await getSheetId(thisSunday);
+        await makeBold(sheetId, 0);
         return thisSunday;
     }
 }

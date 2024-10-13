@@ -35,10 +35,12 @@ export async function addNonDuplicateCustomer(player: IPlayer): Promise<string> 
         const response = await customersApi.searchCustomers({});
         let duplicateCustomer = false;
         let customerId = ``;
+        // TODO: some logic error here customer not always pointing to the right customer
         response.result.customers?.forEach((customer) => {
-            if (customer.emailAddress === player.email && customer.givenName === player.first_name && customer.familyName === player.last_name) {
+            if (customer.emailAddress === player.email && customer.givenName === player.first_name && customer.familyName === player.last_name && customer.phoneNumber === player.phone_no) {
                 console.log(`customer already exists: ${customer.emailAddress} ${customer.givenName} ${customer.familyName} ${customer.phoneNumber}`);
                 duplicateCustomer = true;
+                console.log(`customer id = ${customer.id}`);
                 customerId = customer.id!;
             }
         });
@@ -62,7 +64,7 @@ export async function addNonDuplicateCustomer(player: IPlayer): Promise<string> 
 
 export async function createPayment(sourceId: string, CustomerId: string) {
     try {
-        const createOrderResponse: Order = await createOrder();
+        const createOrderResponse: Order = await createOrder(CustomerId);
         if (createOrderResponse == null || createOrderResponse.id == null || createOrderResponse.totalMoney == null) {
             throw new Error(`Error creating order in createPayment: ${JSON.stringify(createOrderResponse, null, 2)}`);
         }
@@ -94,11 +96,12 @@ export async function createPayment(sourceId: string, CustomerId: string) {
     }
 }
 
-export async function createOrder() {
+export async function createOrder(CustomerId: string): Promise<Order> {
     try {
         // TODO: Test this:
         const response: ApiResponse<CreateOrderResponse> = await ordersApi.createOrder({
             order: {
+                customerId: CustomerId,
                 locationId: LOCATION_ID,
                 lineItems: [
                     {
@@ -159,12 +162,13 @@ payController.post(
             // add a new sheet if this week's sunday's date isn't a sheet name
             const sheetName = await checkAndAppendIfSundayExists();
             console.log(`sheetName = ${sheetName}`);
+            
             // check if player is already in the sheet
             const PlayerIsIn = await sheetContainsPlayer(body.player, sheetName);
             console.log(`is player in: ${PlayerIsIn}`);
             if (PlayerIsIn) {
                 console.log(`player is already in`);
-                // TODO: represents player is already in the google sheet
+                // represents player is already in the google sheet
                 return false;
             }
             // add player to customer list in square

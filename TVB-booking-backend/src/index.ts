@@ -26,7 +26,6 @@ app.get("/test", async () => {
     //     email: "testemail@gmail.com",
     //     phone_no: "0438982888"
     // });
-    await createOrder();
 });
 
 app.listen(3000, () => {
