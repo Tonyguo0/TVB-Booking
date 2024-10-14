@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreateOrderResponse, CreatePaymentResponse, Environment, Order, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
-import { checkAndAddRowToSheet, checkAndAppendIfSundayExists, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
+import { checkAndAddRowToSheet, createSundaySheetIfMissing, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
 import { ITEM_VARIATION_ID, LOCATION_ID, MAX_PLAYERS, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
@@ -160,7 +160,7 @@ payController.post(
             console.log(`Create body payment = `);
             // console.log(JSON.stringify(body));
             // add a new sheet if this week's sunday's date isn't a sheet name
-            const sheetName = await checkAndAppendIfSundayExists();
+            const sheetName = await createSundaySheetIfMissing();
             console.log(`sheetName = ${sheetName}`);
             
             // check if player is already in the sheet
@@ -208,7 +208,7 @@ payController.post(
         try {
             const player: IPlayer = body.player;
             // add a new sheet if this week's sunday's date isn't a sheet name
-            const sheetName = await checkAndAppendIfSundayExists();
+            const sheetName = await createSundaySheetIfMissing();
             console.log(`sheetName = ${sheetName}`);
             const paymentId: string = await getPaymentId(player, sheetName);
             console.log(`paymentId = ${paymentId}`);
@@ -281,7 +281,7 @@ const job = new CronJob(
     "00 00 18 * * 7",
     async () => {
         try {
-            const sheetName = await checkAndAppendIfSundayExists();
+            const sheetName = await createSundaySheetIfMissing();
             console.log(`sheetName = ${sheetName}`);
 
             const sheetId: string = await getSheetId(sheetName);

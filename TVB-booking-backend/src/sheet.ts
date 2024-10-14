@@ -6,6 +6,8 @@ import { IPlayer } from "./model/player";
 import { createPayment } from "./pay";
 import { getThisWeekSunday, MAX_PLAYERS } from "./utils/utils";
 
+// const sheetId =
+
 const auth = new google.auth.GoogleAuth({
     keyFile: path.join(import.meta.dir, `../`, `google-cred.json`),
     scopes: ["https://www.googleapis.com/auth/spreadsheets"]
@@ -29,7 +31,7 @@ async function appendRowToSheet(response: Array<string>, sheetName: string) {
     }
 }
 
-async function makeBold(sheetId: string, rowIndex: number) {
+async function makeRowBold(sheetId: string, rowIndex: number) {
     const request = {
         spreadsheetId: process.env.spread_sheet_id,
         auth: auth,
@@ -41,8 +43,6 @@ async function makeBold(sheetId: string, rowIndex: number) {
                             sheetId: sheetId,
                             startRowIndex: rowIndex,
                             endRowIndex: rowIndex + 1,
-                            startColumnIndex: 0,
-                            endColumnIndex: 6
                         },
                         cell: {
                             userEnteredFormat: {
@@ -141,7 +141,7 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
         const paymentResponse = await createPayment(body.sourceId, customerId);
         const numOfRows = await getNumberOfRows(sheetName);
         console.log(`numOfRows = ${numOfRows}`);
-        
+
         if (numOfRows === MAX_PLAYERS + 1) {
             // Append waiting list title and add the player to the waiting list
             // TODO: add a empty row then append the waiting list title after wards then append the players to waiting list after that
@@ -151,7 +151,7 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
             // TODO: add this sheetId else where e.g. checkAndAppendIfSundayExists()
             const sheetId = await getSheetId(sheetName);
             // TODO: check if this is correct
-            await makeBold(sheetId, MAX_PLAYERS + 2);
+            await makeRowBold(sheetId, MAX_PLAYERS + 2);
             await replaceValueInSheet(`${sheetName}!A${MAX_PLAYERS + 2}`, ` `);
             await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
         } else if (numOfRows < MAX_PLAYERS + 1) {
@@ -250,7 +250,7 @@ export async function getSheetTitle(): Promise<string> {
     }
 }
 
-export async function checkAndAppendIfSundayExists(): Promise<string> {
+export async function createSundaySheetIfMissing(): Promise<string> {
     const latestsheet: string = await getSheetTitle();
     const thisSunday: string = await getThisWeekSunday();
     if (latestsheet === thisSunday) {
@@ -260,10 +260,9 @@ export async function checkAndAppendIfSundayExists(): Promise<string> {
         console.log(`adding a new sheet called ${thisSunday}`);
         await addSheets(thisSunday);
         // Add the title of the columns
-        //TODO: need to make the responses bold
         await appendRowToSheet(["First Name", "Last Name", "Email", "Phone Number", "Pay ID", "Paid?"], thisSunday);
         const sheetId = await getSheetId(thisSunday);
-        await makeBold(sheetId, 0);
+        await makeRowBold(sheetId, 0);
         return thisSunday;
     }
 }
@@ -297,14 +296,22 @@ export async function addSheets(sheetTitle: string): Promise<void> {
 }
 
 export async function getSheetId(sheetName: string) {
-    const response = await sheets.spreadsheets.get({
-        spreadsheetId: process.env.spread_sheet_id,
-        auth: auth
-    });
+    try {
+        const response = await sheets.spreadsheets.get({
+            spreadsheetId: process.env.spread_sheet_id,
+            auth: auth
+        });
 
-    const sheet = response.data.sheets?.find((sheet) => sheet.properties?.title === sheetName);
+        const sheet: sheets_v4.Schema$Sheet | undefined = response.data!.sheets!.find((sheet) => sheet.properties!.title! === sheetName);
+        if (!sheet) {
+            throw new Error(`Sheet with name ${sheetName} not found`);
+        }
 
-    return String(sheet?.properties?.sheetId);
+        return String(sheet?.properties?.sheetId);
+    } catch (error: Error | any) {
+        console.error(error);
+        throw error;
+    }
 }
 
 export async function findRowIndexBasedOnPlayer(player: IPlayer, rows: Array<Array<string>>): Promise<number> {

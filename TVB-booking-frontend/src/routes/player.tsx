@@ -26,7 +26,7 @@ const Player = () => {
     };
 
     // TODO: WIP
-    const refund = async (event: React.FormEvent<HTMLFormElement>) => {
+    const refund = async (event: React.FormEvent<HTMLButtonElement>) => {
         event.preventDefault();
         if (confirm("Are you sure you want to refund? please double check the details before proceeding")) {
             try {

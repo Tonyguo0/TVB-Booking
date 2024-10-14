@@ -1,7 +1,9 @@
 import { useLocation, useNavigate } from "react-router-dom";
-// TODO: do something about this error
-import { Afterpay, BuyerType, CreditCard, Divider, GooglePay, PaymentForm } from "react-square-web-payments-sdk";
+// https://www.npmjs.com/package/react-square-web-payments-sdk-fixed
+import { Afterpay, CreditCard, Divider, GooglePay, PaymentForm } from "react-square-web-payments-sdk-fixed";
+// import { Afterpay, BuyerType, CreditCard, Divider, GooglePay, PaymentForm } from "react-square-web-payments-sdk";
 
+import { TokenResult, VerifyBuyerResponseDetails } from "@square/web-sdk";
 import { IPlayer, emptyPlayer } from "../model/player";
 import payService from "../services/pay";
 
@@ -30,20 +32,18 @@ const Pay = () => {
                  * request. The result will be a valid credit card or wallet token, or an error.
                  */
 
-                cardTokenizeResponseReceived={async (token: { token: string }, buyer: BuyerType) => {
+                cardTokenizeResponseReceived={async (token: TokenResult, buyer: VerifyBuyerResponseDetails | null | undefined) => {
                     console.info({ token, buyer });
                     try {
-                        const response = await payService.createPay(player, token.token);
+                        const response = await payService.createPay(player, token.token!);
                         console.log(response);
                         if (response === true) {
                             alert(`player is on the waiting list!`);
                             navigate(`/`);
-                        }
-                        else if (response === false) {
+                        } else if (response === false) {
                             alert(`player has already registered in TVB!`);
                             navigate(`/`);
-                        }
-                        else if (response?.result?.payment.status === `COMPLETED`) {
+                        } else if (response?.result?.payment.status === `COMPLETED`) {
                             alert(`payment successful`);
                             navigate(`/`);
                         }
@@ -86,7 +86,7 @@ const Pay = () => {
                  * Obtained from the Square Application Dashboard - Locations tab.
                  */
             >
-                <CreditCard includeInputLabels postalCode="12345" callbacks />
+                <CreditCard includeInputLabels postalCode="12345" />
 
                 <Divider />
                 <GooglePay />
