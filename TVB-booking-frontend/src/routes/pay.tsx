@@ -57,7 +57,7 @@ const Pay = () => {
                         countryCode: "AU",
                         currencyCode: "AUD",
                         total: {
-                            amount: "1.00",
+                            amount: "15.00",
                             label: "Total"
                         }
                     };

@@ -109,6 +109,15 @@ export async function createOrder(CustomerId: string): Promise<Order> {
                         catalogObjectId: ITEM_VARIATION_ID,
                         itemType: "ITEM"
                     }
+                ],
+                // TODO: order discounts what's the uid, need to work on the frontend too
+                discounts:[
+                    {
+                        "uid": "EXPLICIT_DISCOUNT_UID",
+                        "name": "Voucher - 100% off",
+                        "percentage": "100",
+                        "scope": "ORDER"
+                    }
                 ]
             }
         });
@@ -162,7 +171,7 @@ payController.post(
             // add a new sheet if this week's sunday's date isn't a sheet name
             const sheetName = await createSundaySheetIfMissing();
             console.log(`sheetName = ${sheetName}`);
-            
+
             // check if player is already in the sheet
             const PlayerIsIn = await sheetContainsPlayer(body.player, sheetName);
             console.log(`is player in: ${PlayerIsIn}`);
