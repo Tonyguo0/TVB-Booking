@@ -35,6 +35,9 @@ bun run dev
 ```
 
 
+## Known issues
+- "Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies." keeps generating due to using google pay and google is infinitely generating this now in one of the log.js files
+
 
 ### Testing
 
@@ -99,3 +102,4 @@ npm run build
 ## Continuous Integration
 
 [GitHub Actions](https://docs.github.com/en/actions) is used for our CI/CD workflows. See `.github/workflows` for details.
+

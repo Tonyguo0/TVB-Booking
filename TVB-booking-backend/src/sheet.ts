@@ -5,6 +5,7 @@ import { IcreatePaybody } from "./model/createPayBody";
 import { IPlayer } from "./model/player";
 import { createPayment } from "./pay";
 import { getThisWeekSunday, MAX_PLAYERS } from "./utils/utils";
+import { ApiResponse, CreatePaymentResponse } from "square";
 
 // const sheetId =
 
@@ -42,7 +43,7 @@ async function makeRowBold(sheetId: string, rowIndex: number) {
                         range: {
                             sheetId: sheetId,
                             startRowIndex: rowIndex,
-                            endRowIndex: rowIndex + 1,
+                            endRowIndex: rowIndex + 1
                         },
                         cell: {
                             userEnteredFormat: {
@@ -137,9 +138,9 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
         // player.firstname, player.lastname, player.email
 
         // TODO: figure out what this is for?
-        const playerArray: Array<string> = [playerDetailsArray[0], playerDetailsArray[1], playerDetailsArray[2], playerDetailsArray[3]];
-        const paymentResponse = await createPayment(body.sourceId, customerId);
-        const numOfRows = await getNumberOfRows(sheetName);
+        // const playerArray: Array<string> = [playerDetailsArray[0], playerDetailsArray[1], playerDetailsArray[2], playerDetailsArray[3]];
+        const paymentResponse: ApiResponse<CreatePaymentResponse> | number = await createPayment(body.sourceId, customerId);
+        const numOfRows: number = await getNumberOfRows(sheetName);
         console.log(`numOfRows = ${numOfRows}`);
 
         if (numOfRows === MAX_PLAYERS + 1) {
@@ -153,15 +154,16 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
             // TODO: check if this is correct
             await makeRowBold(sheetId, MAX_PLAYERS + 2);
             await replaceValueInSheet(`${sheetName}!A${MAX_PLAYERS + 2}`, ` `);
-            await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
+            // append the player to the waiting list and check if there is paymentResponse or if the 100% discount is used
+            await appendRowToSheet([...playerDetailsArray, typeof paymentResponse === `number` ? `` : paymentResponse.result.payment?.id!, `yes`], sheetName);
         } else if (numOfRows < MAX_PLAYERS + 1) {
-            // Append the player for the game
-            await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
+            // Append the player for the game and check if there is paymentResponse or if the 100% discount is used
+            await appendRowToSheet([...playerDetailsArray, typeof paymentResponse === `number` ? `` : paymentResponse.result.payment?.id!, `yes`], sheetName);
             // return paymentResponse here
             return paymentResponse;
         } else {
-            // Append the player for the waiting list
-            await appendRowToSheet([...playerDetailsArray, paymentResponse.result.payment?.id!, `yes`], sheetName);
+            // Append the player for the waiting list and check if there is paymentResponse or if the 100% discount is used
+            await appendRowToSheet([...playerDetailsArray, typeof paymentResponse === `number` ? `` : paymentResponse.result.payment?.id!, `yes`], sheetName);
         }
         // true represents player on waiting list
         return true;

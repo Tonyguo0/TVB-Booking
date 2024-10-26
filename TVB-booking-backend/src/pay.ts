@@ -62,11 +62,15 @@ export async function addNonDuplicateCustomer(player: IPlayer): Promise<string> 
     }
 }
 
-export async function createPayment(sourceId: string, CustomerId: string) {
+export async function createPayment(sourceId: string, CustomerId: string): Promise<ApiResponse<CreatePaymentResponse> | number> {
     try {
         const createOrderResponse: Order = await createOrder(CustomerId);
         if (createOrderResponse == null || createOrderResponse.id == null || createOrderResponse.totalMoney == null) {
             throw new Error(`Error creating order in createPayment: ${JSON.stringify(createOrderResponse, null, 2)}`);
+        }
+        if(createOrderResponse.totalMoney.amount === BigInt(0)){
+            console.log(`payment is not required as it's ${createOrderResponse.totalMoney.amount}!!`);
+            return Number(createOrderResponse.totalMoney.amount);
         }
         const response: ApiResponse<CreatePaymentResponse> = await paymentsApi.createPayment({
             idempotencyKey: randomUUID(),
@@ -91,7 +95,8 @@ export async function createPayment(sourceId: string, CustomerId: string) {
         // CANCELED. The payment is canceled and the payment card funds are released.
         // FAILED. The payment request is declined by the bank.
         return response;
-    } catch (err) {
+    } catch (err:any | Error) {
+        console.log(`error in createPayment: ${err} ${err.stack}`);
         throw err;
     }
 }
@@ -111,12 +116,12 @@ export async function createOrder(CustomerId: string): Promise<Order> {
                     }
                 ],
                 // TODO: order discounts what's the uid, need to work on the frontend too
-                discounts:[
+                discounts: [
                     {
-                        "uid": "EXPLICIT_DISCOUNT_UID",
-                        "name": "Voucher - 100% off",
-                        "percentage": "100",
-                        "scope": "ORDER"
+                        uid: "EXPLICIT_DISCOUNT_UID",
+                        name: "Voucher - 100% off",
+                        percentage: "100",
+                        scope: "ORDER"
                     }
                 ]
             }

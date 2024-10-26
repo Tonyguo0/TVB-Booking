@@ -18,6 +18,7 @@ const Player = () => {
     };
 
     const handlePlayerChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        event.preventDefault();
         const { id, value } = event.target;
         setPlayer((previousPlayer) => ({
             ...previousPlayer,

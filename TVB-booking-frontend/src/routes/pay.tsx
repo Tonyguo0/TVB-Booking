@@ -6,11 +6,21 @@ import { Afterpay, CreditCard, Divider, GooglePay, PaymentForm } from "react-squ
 import { TokenResult, VerifyBuyerResponseDetails } from "@square/web-sdk";
 import { IPlayer, emptyPlayer } from "../model/player";
 import payService from "../services/pay";
+import { useState } from "react";
 
 const Pay = () => {
     const { state } = useLocation();
     let player: IPlayer = emptyPlayer;
+    const [voucher, setVoucher] = useState("");
 
+    const handleChangeVoucher = async (event: React.FormEvent<HTMLInputElement>) => {
+        event.preventDefault();
+        console.log("voucher change", event.currentTarget.value);
+        const value = event.currentTarget.value;
+        console.log(value);
+        setVoucher(value);
+    };
+    
     const SQUARE_APPLICATION_ID: string = import.meta.env.VITE_SB_SQ_APPLICATION_ID;
     const SQUARE_LOCATION_ID: string = import.meta.env.VITE_SB_SQ_LOCATION_ID;
     const navigate = useNavigate();
@@ -37,15 +47,29 @@ const Pay = () => {
                     try {
                         const response = await payService.createPay(player, token.token!);
                         console.log(response);
-                        if (response === true) {
-                            alert(`player is on the waiting list!`);
-                            navigate(`/`);
-                        } else if (response === false) {
-                            alert(`player has already registered in TVB!`);
-                            navigate(`/`);
-                        } else if (response?.result?.payment.status === `COMPLETED`) {
-                            alert(`payment successful`);
-                            navigate(`/`);
+                        switch (response) {
+                            case 0:
+                                alert(`payment wasn't required with the discount you're not on the list!`);
+                                navigate(`/`);
+                                break;
+                            case true:
+                                alert(`player is on the waiting list!`);
+                                navigate(`/`);
+                                break;
+                            case false:
+                                alert(`player has already registered in TVB!`);
+                                navigate(`/`);
+                                break;
+                            case undefined:
+                                alert(`payment unsuccessful`);
+                                navigate(`/`);
+                                break;
+                            default:
+                                if (response.result.payment.status === `COMPLETED`) {
+                                    alert(`payment successful`);
+                                    navigate(`/`);
+                                    break;
+                                }
                         }
                     } catch (err) {
                         console.error(err);
@@ -93,7 +117,7 @@ const Pay = () => {
                 <Divider />
                 <Afterpay />
                 <label htmlFor="voucher">Voucher:</label>
-                <input id="voucher" type="text" />
+                <input id="voucher" type="text" value={voucher} onChange={handleChangeVoucher} />
             </PaymentForm>
         </>
     );
