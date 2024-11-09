@@ -1,7 +1,7 @@
 import { CronJob } from "cron";
 import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
-import { ApiResponse, Client, CreateOrderResponse, CreatePaymentResponse, Environment, Order, RefundPaymentResponse } from "square";
+import { ApiResponse, Client, CreateOrderResponse, CreatePaymentResponse, Environment, Order, OrderLineItemDiscount, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
 import { checkAndAddRowToSheet, createSundaySheetIfMissing, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
 import { ITEM_VARIATION_ID, LOCATION_ID, MAX_PLAYERS, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
@@ -62,13 +62,13 @@ export async function addNonDuplicateCustomer(player: IPlayer): Promise<string> 
     }
 }
 
-export async function createPayment(sourceId: string, CustomerId: string): Promise<ApiResponse<CreatePaymentResponse> | number> {
+export async function createPayment(sourceId: string, CustomerId: string, voucher: string): Promise<ApiResponse<CreatePaymentResponse> | number> {
     try {
-        const createOrderResponse: Order = await createOrder(CustomerId);
+        const createOrderResponse: Order = await createOrder(CustomerId, voucher);
         if (createOrderResponse == null || createOrderResponse.id == null || createOrderResponse.totalMoney == null) {
             throw new Error(`Error creating order in createPayment: ${JSON.stringify(createOrderResponse, null, 2)}`);
         }
-        if(createOrderResponse.totalMoney.amount === BigInt(0)){
+        if (createOrderResponse.totalMoney.amount === BigInt(0)) {
             console.log(`payment is not required as it's ${createOrderResponse.totalMoney.amount}!!`);
             return Number(createOrderResponse.totalMoney.amount);
         }
@@ -95,15 +95,27 @@ export async function createPayment(sourceId: string, CustomerId: string): Promi
         // CANCELED. The payment is canceled and the payment card funds are released.
         // FAILED. The payment request is declined by the bank.
         return response;
-    } catch (err:any | Error) {
+    } catch (err: any | Error) {
         console.log(`error in createPayment: ${err} ${err.stack}`);
         throw err;
     }
 }
 
-export async function createOrder(CustomerId: string): Promise<Order> {
+export async function createOrder(CustomerId: string, voucher: string): Promise<Order> {
     try {
         // TODO: Test this:
+        const discountsArray: Array<OrderLineItemDiscount> =
+            voucher === `FIRSTTIMETVB`
+                ? [
+                      {
+                          uid: `EXPLICIT_DISCOUNT_UID`,
+                          name: `Voucher - 100% off`,
+                          percentage: `100`,
+                          scope: `ORDER`
+                      }
+                  ]
+                : [];
+
         const response: ApiResponse<CreateOrderResponse> = await ordersApi.createOrder({
             order: {
                 customerId: CustomerId,
@@ -116,14 +128,7 @@ export async function createOrder(CustomerId: string): Promise<Order> {
                     }
                 ],
                 // TODO: order discounts what's the uid, need to work on the frontend too
-                discounts: [
-                    {
-                        uid: "EXPLICIT_DISCOUNT_UID",
-                        name: "Voucher - 100% off",
-                        percentage: "100",
-                        scope: "ORDER"
-                    }
-                ]
+                discounts: discountsArray
             }
         });
         console.log(`order created ${JSON.stringify(response, null, 2)}`);
@@ -211,7 +216,8 @@ payController.post(
                 last_name: t.String(),
                 email: t.String(),
                 phone_no: t.String()
-            })
+            }),
+            voucher: t.String()
         })
     }
 );

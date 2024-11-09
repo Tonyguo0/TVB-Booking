@@ -2,11 +2,12 @@ import axios, { AxiosResponse } from "axios";
 import { IPlayer } from "../model/player";
 const baseUrl = "http://localhost:3000/api";
 
-const createPay = async (newPlayer: IPlayer, token: string) => {
+const createPay = async (newPlayer: IPlayer, token: string, voucher: string) => {
     try {
         const body = {
             sourceId: token,
-            player: newPlayer
+            player: newPlayer,
+            voucher: voucher
         };
         console.log(JSON.stringify(body, null, 6));
         const response = await axios.post(`${baseUrl}/createPay`, body);

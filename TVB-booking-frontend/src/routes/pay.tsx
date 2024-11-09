@@ -45,7 +45,7 @@ const Pay = () => {
                 cardTokenizeResponseReceived={async (token: TokenResult, buyer: VerifyBuyerResponseDetails | null | undefined) => {
                     console.info({ token, buyer });
                     try {
-                        const response = await payService.createPay(player, token.token!);
+                        const response = await payService.createPay(player, token.token!, voucher);
                         console.log(response);
                         switch (response) {
                             case 0:
