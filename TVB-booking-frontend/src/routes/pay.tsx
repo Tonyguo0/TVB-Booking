@@ -4,14 +4,20 @@ import { Afterpay, CreditCard, Divider, GooglePay, PaymentForm } from "react-squ
 // import { Afterpay, BuyerType, CreditCard, Divider, GooglePay, PaymentForm } from "react-square-web-payments-sdk";
 
 import { TokenResult, VerifyBuyerResponseDetails } from "@square/web-sdk";
+import { useEffect, useState } from "react";
 import { IPlayer, emptyPlayer } from "../model/player";
 import payService from "../services/pay";
-import { useState } from "react";
 
 const Pay = () => {
     const { state } = useLocation();
     let player: IPlayer = emptyPlayer;
     const [voucher, setVoucher] = useState("");
+    const [amount, setAmount] = useState("15.00");
+    useEffect(() => {
+        if (voucher == `FIRSTTIMETVB`) {
+            setAmount("0.00");
+        }
+    }, [voucher]);
 
     const handleChangeVoucher = async (event: React.FormEvent<HTMLInputElement>) => {
         event.preventDefault();
@@ -19,8 +25,10 @@ const Pay = () => {
         const value = event.currentTarget.value;
         console.log(value);
         setVoucher(value);
+       
+        console.log(amount)
     };
-    
+
     const SQUARE_APPLICATION_ID: string = import.meta.env.VITE_SB_SQ_APPLICATION_ID;
     const SQUARE_LOCATION_ID: string = import.meta.env.VITE_SB_SQ_LOCATION_ID;
     const navigate = useNavigate();
@@ -77,11 +85,13 @@ const Pay = () => {
                     }
                 }}
                 createPaymentRequest={() => {
+                    console.log(amount);
                     return {
                         countryCode: "AU",
                         currencyCode: "AUD",
                         total: {
-                            amount: "15.00",
+                            // TODO: figure out how to dynamically set this amount
+                            amount: amount,
                             label: "Total"
                         }
                     };
@@ -110,6 +120,7 @@ const Pay = () => {
                  * Obtained from the Square Application Dashboard - Locations tab.
                  */
             >
+                {/* figure out how to show the payment amount */}
                 <CreditCard includeInputLabels postalCode="12345" />
 
                 <Divider />

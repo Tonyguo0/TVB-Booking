@@ -34,11 +34,15 @@ const Player = () => {
                 console.log(player)
                 const response = await payService.refundPayment(player);
                 console.log(response);
-                // TODO click refund and test it!!!!!!!!!
-                if(!response || response.statusCode !== 200){
+                if(response===true){
+                    alert("No payment was received player deleted from the list");
+
+                } else if(!response || response.statusCode !== 200){
+                    // TODO click refund and test it!!!!!!!!!
                     throw new Error("Refund unsuccessful");
+                } else{
+                    alert("Refund successful");
                 }
-                alert("Refund successful");
             } catch (err) {
                 console.log(err);
                 alert("Refund unsuccessful caught error");

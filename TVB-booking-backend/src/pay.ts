@@ -62,6 +62,46 @@ export async function addNonDuplicateCustomer(player: IPlayer): Promise<string> 
     }
 }
 
+const deleteOrReplacePlayer = async (player: IPlayer, sheetName: string, sheetId: string) => {
+    try {
+        const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
+        const playerIndex: number = await findRowIndexBasedOnPlayer(player, rows);
+        console.log(`playerIndex = ${playerIndex}`);
+        // TODO: need to test this
+        // TODO: might need to take the outer if, since we want to check if there is a waiting list first or not
+
+        const sheetRowNum: number = await getNumberOfRows(sheetName);
+        // row of where waiting list title starts
+        if (sheetRowNum <= MAX_PLAYERS + 3) {
+            // if number of players doesn't exceed max player limit, delete the player from the sheet
+            // aka: no waiting list
+            await deleteRowBasedOnPlayer(player, sheetName, sheetId);
+        } else {
+            // aka: there is a waiting list
+            if (playerIndex > MAX_PLAYERS + 1) {
+                // if refunded player is in the waiting list, delete the player from the waiting list
+                await deleteRowBasedOnPlayer(player, sheetName, sheetId);
+            } else {
+                // if number of player does exceed max player limit, replace the player with the next player in the waiting list
+                // copyAndReplaceRow() : replace the row which the player was refunded from with the next player in the waiting list
+                // deleteRow(): delete the row of the player who was refunded
+
+                await copyAndReplaceRow(player, sheetName);
+                await deleteRowBasedOnIndex(MAX_PLAYERS + 4, sheetName, sheetId);
+            }
+            if (sheetRowNum === MAX_PLAYERS + 4) {
+                // if the number of players is equal to the max player limit, delete waiting list title and the replacement row
+                // has to be deleted in this order as the rows shift up when a row is deleted
+                await deleteRowBasedOnIndex(MAX_PLAYERS + 3, sheetName, sheetId);
+                await deleteRowBasedOnIndex(MAX_PLAYERS + 2, sheetName, sheetId);
+            }
+        }
+    } catch (err) {
+        console.error(err);
+        throw err;
+    }
+};
+
 export async function createPayment(sourceId: string, CustomerId: string, voucher: string): Promise<ApiResponse<CreatePaymentResponse> | number> {
     try {
         const createOrderResponse: Order = await createOrder(CustomerId, voucher);
@@ -232,8 +272,13 @@ payController.post(
             console.log(`sheetName = ${sheetName}`);
             const paymentId: string = await getPaymentId(player, sheetName);
             console.log(`paymentId = ${paymentId}`);
+
             // get the sheet id (the gid of the sheet) with the sheetName to delete the row
             const sheetId: string = await getSheetId(sheetName);
+            if (paymentId == null) {
+                await deleteOrReplacePlayer(player, sheetName, sheetId);
+                return true;
+            }
             const response: ApiResponse<RefundPaymentResponse> = await refundsApi.refundPayment({
                 idempotencyKey: randomUUID(),
                 amountMoney: {
@@ -248,38 +293,7 @@ payController.post(
             console.log(`refunded response = ${JSON.stringify(response.result.refund, null, 2)}`);
 
             if (response != null && response.body != null && response.result?.refund?.status == `PENDING`) {
-                const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
-                const playerIndex: number = await findRowIndexBasedOnPlayer(player, rows);
-                console.log(`playerIndex = ${playerIndex}`);
-                // TODO: need to test this
-                // TODO: might need to take the outer if since we want to check if there is a waiting list first or not
-
-                const sheetRowNum: number = await getNumberOfRows(sheetName);
-                // row of where waiting list title starts
-                if (sheetRowNum <= MAX_PLAYERS + 3) {
-                    // if number of players doesn't exceed max player limit, delete the player from the sheet
-                    // aka: no waiting list
-                    await deleteRowBasedOnPlayer(player, sheetName, sheetId);
-                } else {
-                    // aka: there is a waiting list
-                    if (playerIndex > MAX_PLAYERS + 1) {
-                        // if refunded player is in the waiting list, delete the player from the waiting list
-                        await deleteRowBasedOnPlayer(player, sheetName, sheetId);
-                    } else {
-                        // if number of player does exceed max player limit, replace the player with the next player in the waiting list
-                        // copyAndReplaceRow() : replace the row which the player was refunded from with the next player in the waiting list
-                        // deleteRow(): delete the row of the player who was refunded
-
-                        await copyAndReplaceRow(player, sheetName);
-                        await deleteRowBasedOnIndex(MAX_PLAYERS + 4, sheetName, sheetId);
-                    }
-                    if (sheetRowNum === MAX_PLAYERS + 4) {
-                        // if the number of players is equal to the max player limit, delete waiting list title and the replacement row
-                        // has to be deleted in this order as the rows shift up when a row is deleted
-                        await deleteRowBasedOnIndex(MAX_PLAYERS + 3, sheetName, sheetId);
-                        await deleteRowBasedOnIndex(MAX_PLAYERS + 2, sheetName, sheetId);
-                    }
-                }
+                await deleteOrReplacePlayer(player, sheetName, sheetId);
             }
             return response;
         } catch (err) {
@@ -317,6 +331,11 @@ const job = new CronJob(
                 if (!row && !row[0]) break;
                 console.log(`row = ${row}`);
                 let payId = row[4];
+                if (payId == null) {
+                    // TODO: Test this
+                    await deleteRowBasedOnPlayer({ first_name: row[0], last_name: row[1], email: row[2], phone_no: row[3] }, sheetName, sheetId);
+                    continue;
+                }
                 const response: ApiResponse<RefundPaymentResponse> = await refundsApi.refundPayment({
                     idempotencyKey: randomUUID(),
                     amountMoney: {
