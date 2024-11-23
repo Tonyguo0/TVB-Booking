@@ -2,6 +2,7 @@ export const MAX_PLAYERS: number = Number(getEnv(process.env.MAX_PLAYERS!));
 export const WAITING_LIST_PLAYER_AMOUNT: number = Number(getEnv(process.env.WAITING_LIST_PLAYER_AMOUNT!));
 export const LOCATION_ID: string = getEnv(process.env.SQUARE_LOCATION_ID!);
 export const ITEM_VARIATION_ID: string = getEnv(process.env.ITEM_VARIATION_ID!);
+export const VOUCHER_CODE: string = getEnv(process.env.VOUCHER_CODE!);
 
 export async function getThisWeekSunday(): Promise<string> {
     const today = new Date();

@@ -4,7 +4,7 @@ import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreateOrderResponse, CreatePaymentResponse, Environment, Order, OrderLineItemDiscount, RefundPaymentResponse } from "square";
 import { IPlayer } from "./model/player";
 import { checkAndAddRowToSheet, createSundaySheetIfMissing, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
-import { ITEM_VARIATION_ID, LOCATION_ID, MAX_PLAYERS, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
+import { ITEM_VARIATION_ID, LOCATION_ID, MAX_PLAYERS, VOUCHER_CODE, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
     interface BigInt {
@@ -145,7 +145,7 @@ export async function createOrder(CustomerId: string, voucher: string): Promise<
     try {
         // TODO: Test this:
         const discountsArray: Array<OrderLineItemDiscount> =
-            voucher === `FIRSTTIMETVB`
+            voucher === VOUCHER_CODE
                 ? [
                       {
                           uid: `EXPLICIT_DISCOUNT_UID`,

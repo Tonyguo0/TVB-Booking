@@ -8,6 +8,8 @@ import { useEffect, useState } from "react";
 import { IPlayer, emptyPlayer } from "../model/player";
 import payService from "../services/pay";
 
+
+
 const Pay = () => {
     const { state } = useLocation();
     let player: IPlayer = emptyPlayer;
@@ -16,6 +18,8 @@ const Pay = () => {
     useEffect(() => {
         if (voucher == `FIRSTTIMETVB`) {
             setAmount("0.00");
+        } else{
+            setAmount("15.00");
         }
     }, [voucher]);
 
@@ -28,6 +32,19 @@ const Pay = () => {
        
         console.log(amount)
     };
+
+    const handleCreatePaymentRequest= () => {
+        console.log(`amount in ${amount}`);
+        return {
+            countryCode: "AU",
+            currencyCode: "AUD",
+            total: {
+                // TODO: figure out how to dynamically set this amount
+                amount: amount,
+                label: "Total"
+            }
+        };
+    }
 
     const SQUARE_APPLICATION_ID: string = import.meta.env.VITE_SB_SQ_APPLICATION_ID;
     const SQUARE_LOCATION_ID: string = import.meta.env.VITE_SB_SQ_LOCATION_ID;
@@ -84,18 +101,7 @@ const Pay = () => {
                         alert(`payment unsuccessful`);
                     }
                 }}
-                createPaymentRequest={() => {
-                    console.log(amount);
-                    return {
-                        countryCode: "AU",
-                        currencyCode: "AUD",
-                        total: {
-                            // TODO: figure out how to dynamically set this amount
-                            amount: amount,
-                            label: "Total"
-                        }
-                    };
-                }}
+                createPaymentRequest={handleCreatePaymentRequest}
                 /**
                  * This function enable the Strong Customer Authentication (SCA) flow
                  *
