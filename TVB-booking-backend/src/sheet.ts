@@ -3,7 +3,7 @@ import _ from "lodash";
 import path from "path";
 import { IcreatePaybody } from "./model/createPayBody";
 import { IPlayer } from "./model/player";
-import { createPayment } from "./pay";
+import { checkIfCustomerExists, createPayment } from "./pay";
 import { getThisWeekSunday, MAX_PLAYERS } from "./utils/utils";
 import { ApiResponse, CreatePaymentResponse } from "square";
 
@@ -136,10 +136,11 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
         const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
         if (!rows) throw new Error(`Response rows is empty`);
         // player.firstname, player.lastname, player.email
-
+        // TODO: check if this works
+        const customerExists: boolean = await checkIfCustomerExists(body.player);
         // TODO: figure out what this is for?
         // const playerArray: Array<string> = [playerDetailsArray[0], playerDetailsArray[1], playerDetailsArray[2], playerDetailsArray[3]];
-        const paymentResponse: ApiResponse<CreatePaymentResponse> | number = await createPayment(body.sourceId, customerId, body.voucher);
+        const paymentResponse: ApiResponse<CreatePaymentResponse> | number = await createPayment(body.sourceId, customerId, body.voucher, customerExists);
         const numOfRows: number = await getNumberOfRows(sheetName);
         console.log(`numOfRows = ${numOfRows}`);
 

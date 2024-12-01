@@ -42,7 +42,13 @@ const Pay = () => {
                 // TODO: figure out how to dynamically set this amount
                 amount: amount,
                 label: "Total"
-            }
+            },
+            discounts: [
+                {
+                    amount:  "0.00",
+                    label: "First Time TVB"
+                }
+            ]
         };
     }
 

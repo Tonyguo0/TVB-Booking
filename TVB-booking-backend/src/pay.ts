@@ -1,7 +1,7 @@
 import { CronJob } from "cron";
 import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
-import { ApiResponse, Client, CreateOrderResponse, CreatePaymentResponse, Environment, Order, OrderLineItemDiscount, RefundPaymentResponse } from "square";
+import { ApiResponse, Client, CreateOrderResponse, CreatePaymentResponse, Environment, Order, OrderLineItemDiscount, RefundPaymentResponse, SearchCustomersResponse } from "square";
 import { IPlayer } from "./model/player";
 import { checkAndAddRowToSheet, createSundaySheetIfMissing, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
 import { ITEM_VARIATION_ID, LOCATION_ID, MAX_PLAYERS, VOUCHER_CODE, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
@@ -62,6 +62,34 @@ export async function addNonDuplicateCustomer(player: IPlayer): Promise<string> 
     }
 }
 
+export const checkIfCustomerExists = async (player: IPlayer): Promise<boolean> => {
+    try{
+        const response: ApiResponse<SearchCustomersResponse> = await customersApi.searchCustomers({
+            query: {
+                filter: {
+                    emailAddress: {
+                        exact: player.email
+                    }
+                }
+            }
+        });
+        let duplicateCustomer = false;
+        if(response?.result?.customers == null) {
+            return duplicateCustomer;
+        }
+        response.result.customers?.forEach((customer) => {
+            if (customer.emailAddress === player.email && customer.givenName === player.first_name && customer.familyName === player.last_name && customer.phoneNumber === player.phone_no) {
+                console.log(`customer already exists: ${customer.emailAddress} ${customer.givenName} ${customer.familyName} ${customer.phoneNumber}`);
+                duplicateCustomer = true;
+            }
+        });
+        return duplicateCustomer;
+    } catch (err) {
+        console.error(err);
+        throw err;
+    }
+};
+
 const deleteOrReplacePlayer = async (player: IPlayer, sheetName: string, sheetId: string) => {
     try {
         const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
@@ -102,9 +130,9 @@ const deleteOrReplacePlayer = async (player: IPlayer, sheetName: string, sheetId
     }
 };
 
-export async function createPayment(sourceId: string, CustomerId: string, voucher: string): Promise<ApiResponse<CreatePaymentResponse> | number> {
+export async function createPayment(sourceId: string, CustomerId: string, voucher: string, customerExists: boolean): Promise<ApiResponse<CreatePaymentResponse> | number> {
     try {
-        const createOrderResponse: Order = await createOrder(CustomerId, voucher);
+        const createOrderResponse: Order = await createOrder(CustomerId, voucher, customerExists);
         if (createOrderResponse == null || createOrderResponse.id == null || createOrderResponse.totalMoney == null) {
             throw new Error(`Error creating order in createPayment: ${JSON.stringify(createOrderResponse, null, 2)}`);
         }
@@ -141,11 +169,12 @@ export async function createPayment(sourceId: string, CustomerId: string, vouche
     }
 }
 
-export async function createOrder(CustomerId: string, voucher: string): Promise<Order> {
+export async function createOrder(CustomerId: string, voucher: string, customerExists: boolean): Promise<Order> {
     try {
         // TODO: Test this:
+        // TODO: can try if customer exists then we don't apply this discount anymore
         const discountsArray: Array<OrderLineItemDiscount> =
-            voucher === VOUCHER_CODE
+            voucher === VOUCHER_CODE && !customerExists
                 ? [
                       {
                           uid: `EXPLICIT_DISCOUNT_UID`,
