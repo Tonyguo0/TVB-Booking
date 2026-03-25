@@ -1,9 +1,10 @@
 import { TextInput, Stack } from "@mantine/core";
+import { type ChangeEvent } from "react";
 import { IPlayer } from "@/model/player";
 
 interface PlayerFormProps {
     player: IPlayer;
-    onPlayerChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    onPlayerChange: (event: ChangeEvent<HTMLInputElement>) => void;
 }
 
 const PlayerForm = ({ player, onPlayerChange }: PlayerFormProps) => {

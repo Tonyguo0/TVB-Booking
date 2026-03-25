@@ -1,12 +1,13 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
 import { payController } from "./pay";
+import { PORT } from "./utils/utils";
 const app = new Elysia({ prefix: `/api` });
 
 app.use(
     cors({
-        allowedHeaders: ["authorization", "Content-Type"], // you can change the headers
-        exposedHeaders: ["authorization"], // you can change the headers
+        allowedHeaders: [`authorization`, `Content-Type`],
+        exposeHeaders: [`authorization`],
         // TODO: have to change this when ready for production
         origin: /^.*?localhost:5173$/,
         methods: [`GET`, `PUT`, `POST`, `DELETE`],
@@ -14,20 +15,14 @@ app.use(
     })
 ).use(payController);
 
-app.get("/", () => "Hello Elysia!!!");
+app.get(`/`, () => `Hello Elysia!!!`);
 
-app.get("/hello", () => "Hello World!");
+app.get(`/hello`, () => `Hello World!`);
 
-app.get("/test", async () => {
+app.get(`/test`, async () => {
     console.log(`test`);
-    // await addNonDuplicateCustomer({
-    //     first_name: "testfn",
-    //     last_name: "testln",
-    //     email: "testemail@gmail.com",
-    //     phone_no: "0438982888"
-    // });
 });
 
-app.listen(3000, () => {
+app.listen(PORT, () => {
     console.log(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
 });

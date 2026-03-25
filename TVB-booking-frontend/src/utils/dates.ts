@@ -1,4 +1,4 @@
-const SESSION_DAYS = [0, 4, 5]; // Sunday, Thursday, Friday
+const SESSION_DAYS: number[] = [0, 4, 5]; // Sunday, Thursday, Friday
 
 /**
  * Returns the next `count` upcoming session dates (Thursday, Friday, Sunday).
@@ -9,11 +9,11 @@ export function getUpcomingSessionDates(
     sessionDays: number[] = SESSION_DAYS
 ): Date[] {
     const dates: Date[] = [];
-    const today = new Date();
+    const today: Date = new Date();
     today.setHours(0, 0, 0, 0);
-    const cursor = new Date(today);
+    const cursor: Date = new Date(today);
 
-    for (let i = 0; dates.length < count && i < 60; i++) {
+    for (let i: number = 0; dates.length < count && i < 60; i++) {
         if (sessionDays.includes(cursor.getDay())) {
             dates.push(new Date(cursor));
         }
@@ -28,9 +28,9 @@ export function getUpcomingSessionDates(
  * e.g., new Date("2025-03-30") -> "30-3-2025"
  */
 export function formatDateForBackend(date: Date): string {
-    const day = date.getDate();
-    const month = date.getMonth() + 1;
-    const year = date.getFullYear();
+    const day: number = date.getDate();
+    const month: number = date.getMonth() + 1;
+    const year: number = date.getFullYear();
     return `${day}-${month}-${year}`;
 }
 
@@ -38,10 +38,10 @@ export function formatDateForBackend(date: Date): string {
  * Formats a Date for display: "Sunday, 30 March 2025"
  */
 export function formatDateForDisplay(date: Date): string {
-    return date.toLocaleDateString("en-AU", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric"
+    return date.toLocaleDateString(`en-AU`, {
+        weekday: `long`,
+        year: `numeric`,
+        month: `long`,
+        day: `numeric`
     });
 }

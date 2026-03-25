@@ -1,11 +1,11 @@
 import { CronJob } from "cron";
 import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
-import { ApiResponse, Client, CreateOrderResponse, CreatePaymentResponse, Environment, Order, OrderLineItemDiscount, RefundPaymentResponse, SearchCustomersResponse } from "square";
+import { SquareClient, SquareEnvironment, CreatePaymentResponse, CreateCustomerResponse, CreateOrderResponse, Order, OrderLineItemDiscount, RefundPaymentResponse, SearchCustomersResponse } from "square";
 import { PayResponse, RefundResponse, SpotsResponse } from "./model/apiResponse";
 import { IPlayer } from "./model/player";
 import { checkAndAddRowToSheet, createSheetForDate, createSundaySheetIfMissing, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
-import { ITEM_VARIATION_ID, LOCATION_ID, MAX_PLAYERS, VOUCHER_CODE, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
+import { ITEM_VARIATION_ID, LOCATION_ID, MAX_PLAYERS, VOUCHER_CODE, WAITING_LIST_PLAYER_AMOUNT, PRICE_AMOUNT_CENTS, PRICE_AMOUNT_DISPLAY, CURRENCY_CODE, CRON_SCHEDULE, TIMEZONE } from "./utils/utils";
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
     interface BigInt {
@@ -18,9 +18,9 @@ BigInt.prototype.toJSON = function () {
     return this.toString();
 };
 
-const { paymentsApi, customersApi, refundsApi, ordersApi } = new Client({
-    accessToken: process.env.SQUARE_ACCESS_TOKEN,
-    environment: process.env.SQUARE_ENVIRONMENT === "production" ? Environment.Production : Environment.Sandbox
+const squareClient: SquareClient = new SquareClient({
+    token: process.env.SQUARE_ACCESS_TOKEN,
+    environment: process.env.SQUARE_ENVIRONMENT === `production` ? SquareEnvironment.Production : SquareEnvironment.Sandbox
 });
 
 export const payController = new Elysia();
@@ -37,11 +37,11 @@ async function resolveSheetName(date?: string): Promise<string> {
 export async function addNonDuplicateCustomer(player: IPlayer): Promise<string> {
     console.log(player);
     try {
-        const response = await customersApi.searchCustomers({});
-        let duplicateCustomer = false;
-        let customerId = ``;
+        const response: SearchCustomersResponse = await squareClient.customers.search({});
+        let duplicateCustomer: boolean = false;
+        let customerId: string = ``;
         // TODO: some logic error here customer not always pointing to the right customer
-        response.result.customers?.forEach((customer) => {
+        response.customers?.forEach((customer) => {
             if (customer.emailAddress === player.email && customer.givenName === player.first_name && customer.familyName === player.last_name && customer.phoneNumber === player.phone_no) {
                 console.log(`customer already exists: ${customer.emailAddress} ${customer.givenName} ${customer.familyName} ${customer.phoneNumber}`);
                 duplicateCustomer = true;
@@ -51,14 +51,14 @@ export async function addNonDuplicateCustomer(player: IPlayer): Promise<string> 
         });
         if (!duplicateCustomer) {
             console.log(`creating customers`);
-            const createReponse = await customersApi.createCustomer({
+            const createReponse: CreateCustomerResponse = await squareClient.customers.create({
                 givenName: player.first_name,
                 familyName: player.last_name,
                 emailAddress: player.email,
                 phoneNumber: player.phone_no
             });
-            console.log(createReponse.result);
-            return createReponse.result.customer?.id!;
+            console.log(createReponse);
+            return createReponse.customer?.id!;
         }
         return customerId;
     } catch (err: Error | any) {
@@ -69,7 +69,7 @@ export async function addNonDuplicateCustomer(player: IPlayer): Promise<string> 
 
 export const checkIfCustomerExists = async (player: IPlayer): Promise<boolean> => {
     try{
-        const response: ApiResponse<SearchCustomersResponse> = await customersApi.searchCustomers({
+        const response: SearchCustomersResponse = await squareClient.customers.search({
             query: {
                 filter: {
                     emailAddress: {
@@ -78,11 +78,11 @@ export const checkIfCustomerExists = async (player: IPlayer): Promise<boolean> =
                 }
             }
         });
-        let duplicateCustomer = false;
-        if(response?.result?.customers == null) {
+        let duplicateCustomer: boolean = false;
+        if(response?.customers == null) {
             return duplicateCustomer;
         }
-        response.result.customers?.forEach((customer) => {
+        response.customers?.forEach((customer) => {
             if (customer.emailAddress === player.email && customer.givenName === player.first_name && customer.familyName === player.last_name && customer.phoneNumber === player.phone_no) {
                 console.log(`customer already exists: ${customer.emailAddress} ${customer.givenName} ${customer.familyName} ${customer.phoneNumber}`);
                 duplicateCustomer = true;
@@ -135,7 +135,7 @@ const deleteOrReplacePlayer = async (player: IPlayer, sheetName: string, sheetId
     }
 };
 
-export async function createPayment(sourceId: string, CustomerId: string, voucher: string, customerExists: boolean): Promise<ApiResponse<CreatePaymentResponse> | number> {
+export async function createPayment(sourceId: string, CustomerId: string, voucher: string, customerExists: boolean): Promise<CreatePaymentResponse | number> {
     try {
         const createOrderResponse: Order = await createOrder(CustomerId, voucher, customerExists);
         if (createOrderResponse == null || createOrderResponse.id == null || createOrderResponse.totalMoney == null) {
@@ -145,18 +145,18 @@ export async function createPayment(sourceId: string, CustomerId: string, vouche
             console.log(`payment is not required as it's ${createOrderResponse.totalMoney.amount}!!`);
             return Number(createOrderResponse.totalMoney.amount);
         }
-        const response: ApiResponse<CreatePaymentResponse> = await paymentsApi.createPayment({
+        const response: CreatePaymentResponse = await squareClient.payments.create({
             idempotencyKey: randomUUID(),
             sourceId: sourceId,
             orderId: createOrderResponse.id,
             amountMoney: {
-                currency: `AUD`,
+                currency: CURRENCY_CODE,
                 amount: createOrderResponse.totalMoney.amount
             },
             customerId: CustomerId
         });
 
-        if (response == null || response.result == null || response.result.payment?.status != `COMPLETED`) {
+        if (response == null || response.payment?.status != `COMPLETED`) {
             throw new Error(`Payment not completed: ${JSON.stringify(response, null, 2)}`);
         }
         console.log(`${JSON.stringify(response, null, 2)}`);
@@ -190,15 +190,15 @@ async function createOrder(CustomerId: string, voucher: string, customerExists: 
                   ]
                 : [];
 
-        const response: ApiResponse<CreateOrderResponse> = await ordersApi.createOrder({
+        const response: CreateOrderResponse = await squareClient.orders.create({
             order: {
                 customerId: CustomerId,
                 locationId: LOCATION_ID,
                 lineItems: [
                     {
-                        quantity: "1",
+                        quantity: `1`,
                         catalogObjectId: ITEM_VARIATION_ID,
-                        itemType: "ITEM"
+                        itemType: `ITEM`
                     }
                 ],
                 // TODO: order discounts what's the uid, need to work on the frontend too
@@ -206,10 +206,10 @@ async function createOrder(CustomerId: string, voucher: string, customerExists: 
             }
         });
         console.log(`order created ${JSON.stringify(response, null, 2)}`);
-        console.log(response?.result?.order?.id);
-        console.log(response?.result?.order?.totalMoney?.amount);
-        if (response != null && response.result != null && response.result.order != null) {
-            return response.result.order;
+        console.log(response?.order?.id);
+        console.log(response?.order?.totalMoney?.amount);
+        if (response != null && response.order != null) {
+            return response.order;
         } else {
             throw new Error(`Order not created: ${JSON.stringify(response, null, 2)}`);
         }
@@ -224,32 +224,32 @@ payController.post(
         try {
             console.log(`Create body payment = `);
             console.log(`Voucher received: ${body.voucher}`);
-            const sheetName = await resolveSheetName(body.date);
+            const sheetName: string = await resolveSheetName(body.date);
             console.log(`sheetName = ${sheetName}`);
 
-            const PlayerIsIn = await sheetContainsPlayer(body.player, sheetName);
+            const PlayerIsIn: boolean = await sheetContainsPlayer(body.player, sheetName);
             console.log(`is player in: ${PlayerIsIn}`);
             if (PlayerIsIn) {
                 console.log(`player is already in`);
-                return { status: "already_registered", message: "Player has already registered for this week" };
+                return { status: `already_registered`, message: `Player has already registered for this week` };
             }
 
             // Check if customer exists BEFORE creating them (for voucher eligibility)
-            const customerExists = await checkIfCustomerExists(body.player);
+            const customerExists: boolean = await checkIfCustomerExists(body.player);
             console.log(`customerExists (before creation): ${customerExists}`);
 
-            const CustomerId = await addNonDuplicateCustomer(body.player);
+            const CustomerId: string = await addNonDuplicateCustomer(body.player);
             if (CustomerId === ``) {
                 throw new Error(`Customer not created or something went wrong with getting customerID: ${CustomerId}`);
             }
-            const response = await checkAndAddRowToSheet(body, CustomerId, sheetName, customerExists);
+            const response: PayResponse = await checkAndAddRowToSheet(body, CustomerId, sheetName, customerExists);
 
             set.status = 201;
-            set.headers["Content-Type"] = "application/json";
+            set.headers[`Content-Type`] = `application/json`;
             return response;
         } catch (err) {
             console.log(err);
-            return { status: "failed", message: "Payment processing failed" };
+            return { status: `failed`, message: `Payment processing failed` };
         }
     },
     {
@@ -272,7 +272,7 @@ payController.post(
     async ({ body, set }): Promise<RefundResponse> => {
         try {
             const player: IPlayer = body.player;
-            const sheetName = await resolveSheetName(body.date);
+            const sheetName: string = await resolveSheetName(body.date);
             console.log(`sheetName = ${sheetName}`);
             const paymentId: string = await getPaymentId(player, sheetName);
             console.log(`paymentId = ${paymentId}`);
@@ -280,36 +280,36 @@ payController.post(
             const sheetId: string = await getSheetId(sheetName);
             if (paymentId == null || paymentId === ``) {
                 await deleteOrReplacePlayer(player, sheetName, sheetId);
-                return { status: "deleted_no_payment", message: "No payment was received, player removed from the list" };
+                return { status: `deleted_no_payment`, message: `No payment was received, player removed from the list` };
             }
-            const response: ApiResponse<RefundPaymentResponse> = await refundsApi.refundPayment({
+            const response: RefundPaymentResponse = await squareClient.refunds.refundPayment({
                 idempotencyKey: randomUUID(),
                 amountMoney: {
-                    amount: BigInt(1500),
-                    currency: `AUD`
+                    amount: PRICE_AMOUNT_CENTS,
+                    currency: CURRENCY_CODE
                 },
                 paymentId: paymentId,
                 reason: `requested_by_customer`
             });
             set.status = 201;
-            set.headers["Content-Type"] = "application/json";
-            console.log(`refunded response = ${JSON.stringify(response.result.refund, null, 2)}`);
+            set.headers[`Content-Type`] = `application/json`;
+            console.log(`refunded response = ${JSON.stringify(response.refund, null, 2)}`);
 
-            if (response != null && response.body != null && response.result?.refund?.status == `PENDING`) {
+            if (response != null && response.refund?.status == `PENDING`) {
                 await deleteOrReplacePlayer(player, sheetName, sheetId);
-                return { status: "refunded", message: "Refund processed successfully" };
+                return { status: `refunded`, message: `Refund processed successfully` };
             }
-            return { status: "failed", message: "Refund was not completed by Square" };
+            return { status: `failed`, message: `Refund was not completed by Square` };
         } catch (err: any) {
             console.log(err);
-            const msg = err?.message ?? "";
-            if (msg.includes("Player not found")) {
-                return { status: "failed", message: "Player not found for the selected date. Please check your details." };
+            const msg: string = err?.message ?? ``;
+            if (msg.includes(`Player not found`)) {
+                return { status: `failed`, message: `Player not found for the selected date. Please check your details.` };
             }
-            if (msg.includes("Sheet with name")) {
-                return { status: "failed", message: "No session found for the selected date." };
+            if (msg.includes(`Sheet with name`)) {
+                return { status: `failed`, message: `No session found for the selected date.` };
             }
-            return { status: "failed", message: "Refund processing failed. Please try again later." };
+            return { status: `failed`, message: `Refund processing failed. Please try again later.` };
         }
     },
     {
@@ -331,25 +331,25 @@ payController.post(
     async ({ body }): Promise<{ valid: boolean; amount: string; message?: string }> => {
         try {
             console.log(`Validating voucher: "${body.voucher}"`);
-            const customerExists = await checkIfCustomerExists(body.player);
+            const customerExists: boolean = await checkIfCustomerExists(body.player);
             console.log(`customerExists: ${customerExists}, voucher matches: ${body.voucher === VOUCHER_CODE}`);
 
             if (body.voucher === VOUCHER_CODE && !customerExists) {
-                return { valid: true, amount: "0.00" };
+                return { valid: true, amount: `0.00` };
             }
 
-            if (body.voucher !== "" && body.voucher !== VOUCHER_CODE) {
-                return { valid: false, amount: "15.00", message: "Invalid voucher code" };
+            if (body.voucher !== `` && body.voucher !== VOUCHER_CODE) {
+                return { valid: false, amount: PRICE_AMOUNT_DISPLAY, message: `Invalid voucher code` };
             }
 
             if (customerExists && body.voucher === VOUCHER_CODE) {
-                return { valid: false, amount: "15.00", message: "Voucher already used or not applicable for this player" };
+                return { valid: false, amount: PRICE_AMOUNT_DISPLAY, message: `Voucher already used or not applicable for this player` };
             }
 
-            return { valid: false, amount: "15.00" };
+            return { valid: false, amount: PRICE_AMOUNT_DISPLAY };
         } catch (err) {
             console.error(err);
-            return { valid: false, amount: "15.00" };
+            return { valid: false, amount: PRICE_AMOUNT_DISPLAY };
         }
     },
     { body: playerBodySchema }
@@ -360,39 +360,39 @@ payController.post(
     async ({ body, set }): Promise<PayResponse> => {
         try {
             console.log(`Registering player with voucher: "${body.voucher}"`);
-            const sheetName = await resolveSheetName(body.date);
+            const sheetName: string = await resolveSheetName(body.date);
 
-            const PlayerIsIn = await sheetContainsPlayer(body.player, sheetName);
+            const PlayerIsIn: boolean = await sheetContainsPlayer(body.player, sheetName);
             if (PlayerIsIn) {
-                return { status: "already_registered", message: "Player has already registered for this week" };
+                return { status: `already_registered`, message: `Player has already registered for this week` };
             }
 
             // Validate voucher server-side (defense in depth)
-            const customerExists = await checkIfCustomerExists(body.player);
+            const customerExists: boolean = await checkIfCustomerExists(body.player);
             console.log(`customerExists (before creation): ${customerExists}`);
             if (body.voucher !== VOUCHER_CODE || customerExists) {
-                return { status: "failed", message: "Voucher is not valid for this player" };
+                return { status: `failed`, message: `Voucher is not valid for this player` };
             }
 
-            const CustomerId = await addNonDuplicateCustomer(body.player);
+            const CustomerId: string = await addNonDuplicateCustomer(body.player);
             if (CustomerId === ``) {
                 throw new Error(`Customer not created`);
             }
 
             // Pass customerExistsOverride as false since we validated BEFORE creating the customer
-            const response = await checkAndAddRowToSheet(
-                { sourceId: "", player: body.player, voucher: body.voucher },
+            const response: PayResponse = await checkAndAddRowToSheet(
+                { sourceId: ``, player: body.player, voucher: body.voucher },
                 CustomerId,
                 sheetName,
                 false
             );
 
             set.status = 201;
-            set.headers["Content-Type"] = "application/json";
+            set.headers[`Content-Type`] = `application/json`;
             return response;
         } catch (err) {
             console.log(err);
-            return { status: "failed", message: "Registration failed" };
+            return { status: `failed`, message: `Registration failed` };
         }
     },
     { body: playerBodySchema }
@@ -402,7 +402,7 @@ payController.get(
     `/spots`,
     async ({ query }): Promise<SpotsResponse> => {
         try {
-            const date = query.date;
+            const date: string | undefined = query.date;
             if (!date) {
                 return { total: MAX_PLAYERS, taken: 0, remaining: MAX_PLAYERS };
             }
@@ -413,13 +413,13 @@ payController.get(
                 return { total: MAX_PLAYERS, taken: 0, remaining: MAX_PLAYERS };
             }
 
-            const rowCount = await getNumberOfRows(date);
-            const taken = Math.min(Math.max(0, rowCount - 1), MAX_PLAYERS);
-            const remaining = MAX_PLAYERS - taken;
+            const rowCount: number = await getNumberOfRows(date);
+            const taken: number = Math.min(Math.max(0, rowCount - 1), MAX_PLAYERS);
+            const remaining: number = MAX_PLAYERS - taken;
 
             return { total: MAX_PLAYERS, taken, remaining };
         } catch (err) {
-            console.error("Error fetching spots:", err);
+            console.error(`Error fetching spots:`, err);
             return { total: MAX_PLAYERS, taken: 0, remaining: MAX_PLAYERS };
         }
     },
@@ -433,12 +433,12 @@ payController.get(
 // Schedule a task to run at a specific date and time
 // The cron syntax is 'second minute hour day month dayOfWeek'
 // This will run at 00:00:00 on December 31
-const job = new CronJob(
+new CronJob(
     // seconds, minutes, hours, day of month, month, day of week
-    "00 00 18 * * 7",
+    CRON_SCHEDULE,
     async () => {
         try {
-            const sheetName = await createSundaySheetIfMissing();
+            const sheetName: string = await createSundaySheetIfMissing();
             console.log(`sheetName = ${sheetName}`);
 
             const sheetId: string = await getSheetId(sheetName);
@@ -453,23 +453,23 @@ const job = new CronJob(
             for (const row of RowsToBeReplaced) {
                 if (!row || !row[0]) break;
                 console.log(`row = ${row}`);
-                let payId = row[4];
+                let payId: string = row[4];
                 if (payId == null || payId === ``) {
                     await deleteRowBasedOnPlayer({ first_name: row[0], last_name: row[1], email: row[2], phone_no: row[3] }, sheetName, sheetId);
                     continue;
                 }
-                const response: ApiResponse<RefundPaymentResponse> = await refundsApi.refundPayment({
+                const response: RefundPaymentResponse = await squareClient.refunds.refundPayment({
                     idempotencyKey: randomUUID(),
                     amountMoney: {
-                        amount: BigInt(1500),
-                        currency: `AUD`
+                        amount: PRICE_AMOUNT_CENTS,
+                        currency: CURRENCY_CODE
                     },
                     paymentId: payId,
                     reason: `requested_by_customer`
                 });
-                if (response != null && response.body != null && response.result?.refund?.status == `PENDING`) {
+                if (response != null && response.refund?.status == `PENDING`) {
                     // delete the player from the waiting list
-                    console.log(`refund response: ${JSON.stringify(response.result, null, 2)}`);
+                    console.log(`refund response: ${JSON.stringify(response, null, 2)}`);
                     await deleteRowBasedOnPlayer({ first_name: row[0], last_name: row[1], email: row[2], phone_no: row[3] }, sheetName, sheetId);
                 } else {
                     console.error(`Refund failed for ${row[0]} ${row[1]} ${row[2]} ${row[3]}`);
@@ -485,5 +485,5 @@ const job = new CronJob(
     },
     null,
     true,
-    "Australia/Perth"
+    TIMEZONE
 );

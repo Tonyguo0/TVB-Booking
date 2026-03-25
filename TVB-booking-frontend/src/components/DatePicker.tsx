@@ -8,25 +8,25 @@ interface DatePickerProps {
 }
 
 const DatePicker = ({ selectedDate, onDateSelect }: DatePickerProps) => {
-    const sessionDates = getUpcomingSessionDates(12);
-    const firstDate = sessionDates[0];
-    const lastDate = sessionDates[sessionDates.length - 1];
+    const sessionDates: Date[] = getUpcomingSessionDates(12);
+    const firstDate: Date = sessionDates[0];
+    const lastDate: Date = sessionDates[sessionDates.length - 1];
 
-    const sessionDateStrings = sessionDates.map((d) => d.toDateString());
+    const sessionDateStrings: string[] = sessionDates.map((d) => d.toDateString());
 
     const isSessionDate = (dateStr: string): boolean => {
-        const date = new Date(dateStr);
+        const date: Date = new Date(dateStr);
         return sessionDateStrings.includes(date.toDateString());
     };
 
     const toDateString = (date: Date): string => {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, "0");
-        const d = String(date.getDate()).padStart(2, "0");
+        const y: number = date.getFullYear();
+        const m: string = String(date.getMonth() + 1).padStart(2, `0`);
+        const d: string = String(date.getDate()).padStart(2, `0`);
         return `${y}-${m}-${d}`;
     };
 
-    const handleChange = (value: string | null) => {
+    const handleChange = (value: string | null): void => {
         if (value) {
             onDateSelect(new Date(value));
         } else {

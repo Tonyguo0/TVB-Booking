@@ -3,11 +3,6 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "exports": {
-    ".": {
-      "types": "./node_modules/react-square-web-payments-sdk/dist/index.d.ts"
-    }
-  },
   "scripts": {
     "start": "vite",
     "dev:bun": "bunx --bun vite",
@@ -21,31 +16,32 @@
     "@mantine/dates": "^8.3.18",
     "@mantine/hooks": "^8.3.18",
     "@mantine/notifications": "^8.3.18",
-    "@square/web-sdk": "^2.0.1",
-    "axios": "^1.6.3",
+    "@square/web-sdk": "^2.1.0",
+    "axios": "^1.13.6",
     "dayjs": "^1.11.20",
-    "lucide-react": "^1.6.0",
+    "lucide-react": "^1.7.0",
     "postcss": "^8.5.8",
     "postcss-preset-mantine": "^1.18.0",
     "postcss-simple-vars": "^7.0.1",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.0",
-    "react-square-web-payments-sdk-fixed": "^3.2.1-fixed",
-    "square": "^33.1.0"
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.13.2",
+    "react-square-web-payments-sdk": "^3.3.0",
+    "square": "^44.0.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.2",
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
-    "@typescript-eslint/eslint-plugin": "^6.14.0",
-    "@typescript-eslint/parser": "^6.14.0",
-    "@vitejs/plugin-react": "^4.2.1",
-    "eslint": "^8.55.0",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.5",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.57.2",
+    "@typescript-eslint/parser": "^8.57.2",
+    "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^10.1.0",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
     "tailwindcss": "^4.2.2",
-    "typescript": "^5.2.2",
-    "vite": "^5.0.8"
+    "typescript": "^6.0.2",
+    "vite": "^8.0.2"
   }
 }
