@@ -105,5 +105,5 @@
         "esm": true,
         "require": ["tsconfig-paths/register"]
     },
-    "include": ["src", "src/bigint.ts"]
+    "include": ["src"]
 }

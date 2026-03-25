@@ -4,4 +4,5 @@ export interface IcreatePaybody {
     sourceId: string;
     player: IPlayer;
     voucher: string;
+    date?: string;
 }

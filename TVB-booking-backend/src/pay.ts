@@ -2,8 +2,9 @@ import { CronJob } from "cron";
 import { randomUUID } from "crypto";
 import Elysia, { t } from "elysia";
 import { ApiResponse, Client, CreateOrderResponse, CreatePaymentResponse, Environment, Order, OrderLineItemDiscount, RefundPaymentResponse, SearchCustomersResponse } from "square";
+import { PayResponse, RefundResponse, SpotsResponse } from "./model/apiResponse";
 import { IPlayer } from "./model/player";
-import { checkAndAddRowToSheet, createSundaySheetIfMissing, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
+import { checkAndAddRowToSheet, createSheetForDate, createSundaySheetIfMissing, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
 import { ITEM_VARIATION_ID, LOCATION_ID, MAX_PLAYERS, VOUCHER_CODE, WAITING_LIST_PLAYER_AMOUNT } from "./utils/utils";
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
@@ -19,10 +20,14 @@ BigInt.prototype.toJSON = function () {
 
 const { paymentsApi, customersApi, refundsApi, ordersApi } = new Client({
     accessToken: process.env.SQUARE_ACCESS_TOKEN,
-    environment: Environment.Sandbox
+    environment: process.env.SQUARE_ENVIRONMENT === "production" ? Environment.Production : Environment.Sandbox
 });
 
 export const payController = new Elysia();
+
+async function resolveSheetName(date?: string): Promise<string> {
+    return date ? await createSheetForDate(date) : await createSundaySheetIfMissing();
+}
 
 /**
  * Adds a non-duplicate customer to the system.
@@ -169,7 +174,7 @@ export async function createPayment(sourceId: string, CustomerId: string, vouche
     }
 }
 
-export async function createOrder(CustomerId: string, voucher: string, customerExists: boolean): Promise<Order> {
+async function createOrder(CustomerId: string, voucher: string, customerExists: boolean): Promise<Order> {
     try {
         // TODO: Test this:
         // TODO: can try if customer exists then we don't apply this discount anymore
@@ -213,68 +218,38 @@ export async function createOrder(CustomerId: string, voucher: string, customerE
     }
 }
 
-export async function payForOrder() {
-    try {
-        // TODO: Test this:
-        const response: ApiResponse<CreateOrderResponse> = await ordersApi.createOrder({
-            order: {
-                locationId: LOCATION_ID,
-                lineItems: [
-                    {
-                        quantity: "1",
-                        // TODO: change this to environment variable ITEM_VARIATION_ID
-                        catalogObjectId: "Y3QYAB4OIOW2FEEFKGE35PQP",
-                        itemType: "ITEM"
-                    }
-                ]
-            }
-        });
-        // TODO: ITEMID: CIJMPF2RMDRBURW4XUSHLTTO
-        // TODO: ITEM_VARIATION_ID: Y3QYAB4OIOW2FEEFKGE35PQP
-        console.log(`order created ${JSON.stringify(response, null, 2)}`);
-        console.log(response?.result?.order?.id);
-        console.log(response?.result?.order?.totalMoney?.amount);
-
-        return response;
-    } catch (err) {
-        throw err;
-    }
-}
-
 payController.post(
     `/createPay`,
-    async ({ body, set }) => {
+    async ({ body, set }): Promise<PayResponse> => {
         try {
             console.log(`Create body payment = `);
-            // console.log(JSON.stringify(body));
-            // add a new sheet if this week's sunday's date isn't a sheet name
-            const sheetName = await createSundaySheetIfMissing();
+            console.log(`Voucher received: ${body.voucher}`);
+            const sheetName = await resolveSheetName(body.date);
             console.log(`sheetName = ${sheetName}`);
 
-            // check if player is already in the sheet
             const PlayerIsIn = await sheetContainsPlayer(body.player, sheetName);
             console.log(`is player in: ${PlayerIsIn}`);
             if (PlayerIsIn) {
                 console.log(`player is already in`);
-                // represents player is already in the google sheet
-                return false;
+                return { status: "already_registered", message: "Player has already registered for this week" };
             }
-            // add player to customer list in square
+
+            // Check if customer exists BEFORE creating them (for voucher eligibility)
+            const customerExists = await checkIfCustomerExists(body.player);
+            console.log(`customerExists (before creation): ${customerExists}`);
+
             const CustomerId = await addNonDuplicateCustomer(body.player);
             if (CustomerId === ``) {
                 throw new Error(`Customer not created or something went wrong with getting customerID: ${CustomerId}`);
             }
-            const response = await checkAndAddRowToSheet(body, CustomerId, sheetName);
+            const response = await checkAndAddRowToSheet(body, CustomerId, sheetName, customerExists);
 
-            // TODO: need to add in error handling for other payment response statuses here
-            // console.log(`result = `);
-            // console.log(result);
             set.status = 201;
             set.headers["Content-Type"] = "application/json";
-
-            return response === true ? response : JSON.stringify(response);
+            return response;
         } catch (err) {
             console.log(err);
+            return { status: "failed", message: "Payment processing failed" };
         }
     },
     {
@@ -286,32 +261,31 @@ payController.post(
                 email: t.String(),
                 phone_no: t.String()
             }),
-            voucher: t.String()
+            voucher: t.String(),
+            date: t.Optional(t.String())
         })
     }
 );
 
 payController.post(
     `/refundPayment`,
-    async ({ body, set }) => {
+    async ({ body, set }): Promise<RefundResponse> => {
         try {
             const player: IPlayer = body.player;
-            // add a new sheet if this week's sunday's date isn't a sheet name
-            const sheetName = await createSundaySheetIfMissing();
+            const sheetName = await resolveSheetName(body.date);
             console.log(`sheetName = ${sheetName}`);
             const paymentId: string = await getPaymentId(player, sheetName);
             console.log(`paymentId = ${paymentId}`);
 
-            // get the sheet id (the gid of the sheet) with the sheetName to delete the row
             const sheetId: string = await getSheetId(sheetName);
-            if (paymentId == null) {
+            if (paymentId == null || paymentId === ``) {
                 await deleteOrReplacePlayer(player, sheetName, sheetId);
-                return true;
+                return { status: "deleted_no_payment", message: "No payment was received, player removed from the list" };
             }
             const response: ApiResponse<RefundPaymentResponse> = await refundsApi.refundPayment({
                 idempotencyKey: randomUUID(),
                 amountMoney: {
-                    amount: BigInt(100),
+                    amount: BigInt(1500),
                     currency: `AUD`
                 },
                 paymentId: paymentId,
@@ -323,15 +297,135 @@ payController.post(
 
             if (response != null && response.body != null && response.result?.refund?.status == `PENDING`) {
                 await deleteOrReplacePlayer(player, sheetName, sheetId);
+                return { status: "refunded", message: "Refund processed successfully" };
             }
-            return response;
-        } catch (err) {
+            return { status: "failed", message: "Refund was not completed by Square" };
+        } catch (err: any) {
             console.log(err);
+            const msg = err?.message ?? "";
+            if (msg.includes("Player not found")) {
+                return { status: "failed", message: "Player not found for the selected date. Please check your details." };
+            }
+            if (msg.includes("Sheet with name")) {
+                return { status: "failed", message: "No session found for the selected date." };
+            }
+            return { status: "failed", message: "Refund processing failed. Please try again later." };
         }
     },
     {
         body: t.Object({
-            player: t.Object({ first_name: t.String(), last_name: t.String(), email: t.String(), phone_no: t.String() })
+            player: t.Object({ first_name: t.String(), last_name: t.String(), email: t.String(), phone_no: t.String() }),
+            date: t.Optional(t.String())
+        })
+    }
+);
+
+const playerBodySchema = t.Object({
+    player: t.Object({ first_name: t.String(), last_name: t.String(), email: t.String(), phone_no: t.String() }),
+    voucher: t.String(),
+    date: t.Optional(t.String())
+});
+
+payController.post(
+    `/validateVoucher`,
+    async ({ body }): Promise<{ valid: boolean; amount: string; message?: string }> => {
+        try {
+            console.log(`Validating voucher: "${body.voucher}"`);
+            const customerExists = await checkIfCustomerExists(body.player);
+            console.log(`customerExists: ${customerExists}, voucher matches: ${body.voucher === VOUCHER_CODE}`);
+
+            if (body.voucher === VOUCHER_CODE && !customerExists) {
+                return { valid: true, amount: "0.00" };
+            }
+
+            if (body.voucher !== "" && body.voucher !== VOUCHER_CODE) {
+                return { valid: false, amount: "15.00", message: "Invalid voucher code" };
+            }
+
+            if (customerExists && body.voucher === VOUCHER_CODE) {
+                return { valid: false, amount: "15.00", message: "Voucher already used or not applicable for this player" };
+            }
+
+            return { valid: false, amount: "15.00" };
+        } catch (err) {
+            console.error(err);
+            return { valid: false, amount: "15.00" };
+        }
+    },
+    { body: playerBodySchema }
+);
+
+payController.post(
+    `/registerWithVoucher`,
+    async ({ body, set }): Promise<PayResponse> => {
+        try {
+            console.log(`Registering player with voucher: "${body.voucher}"`);
+            const sheetName = await resolveSheetName(body.date);
+
+            const PlayerIsIn = await sheetContainsPlayer(body.player, sheetName);
+            if (PlayerIsIn) {
+                return { status: "already_registered", message: "Player has already registered for this week" };
+            }
+
+            // Validate voucher server-side (defense in depth)
+            const customerExists = await checkIfCustomerExists(body.player);
+            console.log(`customerExists (before creation): ${customerExists}`);
+            if (body.voucher !== VOUCHER_CODE || customerExists) {
+                return { status: "failed", message: "Voucher is not valid for this player" };
+            }
+
+            const CustomerId = await addNonDuplicateCustomer(body.player);
+            if (CustomerId === ``) {
+                throw new Error(`Customer not created`);
+            }
+
+            // Pass customerExistsOverride as false since we validated BEFORE creating the customer
+            const response = await checkAndAddRowToSheet(
+                { sourceId: "", player: body.player, voucher: body.voucher },
+                CustomerId,
+                sheetName,
+                false
+            );
+
+            set.status = 201;
+            set.headers["Content-Type"] = "application/json";
+            return response;
+        } catch (err) {
+            console.log(err);
+            return { status: "failed", message: "Registration failed" };
+        }
+    },
+    { body: playerBodySchema }
+);
+
+payController.get(
+    `/spots`,
+    async ({ query }): Promise<SpotsResponse> => {
+        try {
+            const date = query.date;
+            if (!date) {
+                return { total: MAX_PLAYERS, taken: 0, remaining: MAX_PLAYERS };
+            }
+
+            try {
+                await getSheetId(date);
+            } catch {
+                return { total: MAX_PLAYERS, taken: 0, remaining: MAX_PLAYERS };
+            }
+
+            const rowCount = await getNumberOfRows(date);
+            const taken = Math.min(Math.max(0, rowCount - 1), MAX_PLAYERS);
+            const remaining = MAX_PLAYERS - taken;
+
+            return { total: MAX_PLAYERS, taken, remaining };
+        } catch (err) {
+            console.error("Error fetching spots:", err);
+            return { total: MAX_PLAYERS, taken: 0, remaining: MAX_PLAYERS };
+        }
+    },
+    {
+        query: t.Object({
+            date: t.Optional(t.String())
         })
     }
 );
@@ -357,18 +451,17 @@ const job = new CronJob(
             }
 
             for (const row of RowsToBeReplaced) {
-                if (!row && !row[0]) break;
+                if (!row || !row[0]) break;
                 console.log(`row = ${row}`);
                 let payId = row[4];
-                if (payId == null) {
-                    // TODO: Test this
+                if (payId == null || payId === ``) {
                     await deleteRowBasedOnPlayer({ first_name: row[0], last_name: row[1], email: row[2], phone_no: row[3] }, sheetName, sheetId);
                     continue;
                 }
                 const response: ApiResponse<RefundPaymentResponse> = await refundsApi.refundPayment({
                     idempotencyKey: randomUUID(),
                     amountMoney: {
-                        amount: BigInt(100),
+                        amount: BigInt(1500),
                         currency: `AUD`
                     },
                     paymentId: payId,

@@ -1,6 +1,6 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
-import { createOrder, payController } from "./pay";
+import { payController } from "./pay";
 const app = new Elysia({ prefix: `/api` });
 
 app.use(

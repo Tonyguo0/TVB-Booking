@@ -1,6 +1,7 @@
 import { google, sheets_v4 } from "googleapis";
 import _ from "lodash";
 import path from "path";
+import { PayResponse } from "./model/apiResponse";
 import { IcreatePaybody } from "./model/createPayBody";
 import { IPlayer } from "./model/player";
 import { checkIfCustomerExists, createPayment } from "./pay";
@@ -129,45 +130,46 @@ async function insertRow(sheetId: number, insertAtIndex: number) {
  * @returns A Promise that resolves when the row is successfully appended.
  */
 // TODO: add functionality in refund so that it deletes the row of the player and add another player from the waiting list to replace the old player
-export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: string, sheetName: string) {
-    // TODO: add to the correct coloumns of excel sheet payid: response.result.payment?.id!, paid or not: `yes`
+export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: string, sheetName: string, customerExistsOverride?: boolean): Promise<PayResponse> {
     const playerDetailsArray: Array<string> = [body.player.first_name, body.player.last_name, body.player.email, body.player.phone_no];
     try {
         const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
         if (!rows) throw new Error(`Response rows is empty`);
-        // player.firstname, player.lastname, player.email
-        // TODO: check if this works
-        const customerExists: boolean = await checkIfCustomerExists(body.player);
-        // TODO: figure out what this is for?
-        // const playerArray: Array<string> = [playerDetailsArray[0], playerDetailsArray[1], playerDetailsArray[2], playerDetailsArray[3]];
+        const customerExists: boolean = customerExistsOverride ?? await checkIfCustomerExists(body.player);
+        console.log(`customerExists in checkAndAddRowToSheet: ${customerExists}`);
         const paymentResponse: ApiResponse<CreatePaymentResponse> | number = await createPayment(body.sourceId, customerId, body.voucher, customerExists);
         const numOfRows: number = await getNumberOfRows(sheetName);
         console.log(`numOfRows = ${numOfRows}`);
 
+        const paymentId = typeof paymentResponse === `number` ? `` : paymentResponse.result.payment?.id!;
+        const isVoucherApplied = typeof paymentResponse === `number`;
+
         if (numOfRows === MAX_PLAYERS + 1) {
             // Append waiting list title and add the player to the waiting list
-            // TODO: add a empty row then append the waiting list title after wards then append the players to waiting list after that
             // number of columns
             await appendRowToSheet(["replacementValue"], sheetName);
             await appendRowToSheet(["waiting list:"], sheetName);
-            // TODO: add this sheetId else where e.g. checkAndAppendIfSundayExists()
             const sheetId = await getSheetId(sheetName);
-            // TODO: check if this is correct
             await makeRowBold(sheetId, MAX_PLAYERS + 2);
             await replaceValueInSheet(`${sheetName}!A${MAX_PLAYERS + 2}`, ` `);
             // append the player to the waiting list and check if there is paymentResponse or if the 100% discount is used
-            await appendRowToSheet([...playerDetailsArray, typeof paymentResponse === `number` ? `` : paymentResponse.result.payment?.id!, `yes`], sheetName);
+            await appendRowToSheet([...playerDetailsArray, paymentId, `yes`], sheetName);
         } else if (numOfRows < MAX_PLAYERS + 1) {
             // Append the player for the game and check if there is paymentResponse or if the 100% discount is used
-            await appendRowToSheet([...playerDetailsArray, typeof paymentResponse === `number` ? `` : paymentResponse.result.payment?.id!, `yes`], sheetName);
-            // return paymentResponse here
-            return paymentResponse;
+            await appendRowToSheet([...playerDetailsArray, paymentId, `yes`], sheetName);
+            return {
+                status: isVoucherApplied ? "voucher_applied" : "paid",
+                paymentId: paymentId || undefined,
+                message: isVoucherApplied ? "Voucher applied, no payment required" : "Payment successful"
+            };
         } else {
-            // Append the player for the waiting list and check if there is paymentResponse or if the 100% discount is used
-            await appendRowToSheet([...playerDetailsArray, typeof paymentResponse === `number` ? `` : paymentResponse.result.payment?.id!, `yes`], sheetName);
+            await appendRowToSheet([...playerDetailsArray, paymentId, `yes`], sheetName);
         }
-        // true represents player on waiting list
-        return true;
+        return {
+            status: "waiting_list",
+            paymentId: paymentId || undefined,
+            message: "Player added to the waiting list"
+        };
     } catch (err: Error | any) {
         throw new Error(`The API returned an error: ${err.message}`);
     }
@@ -184,7 +186,7 @@ export async function getRow(sheetName: string, rowLetterFrom: string, rowLetter
         return row;
     } catch (err: Error | any) {
         console.error(`The API returned an error: ${err.message}`);
-        return err;
+        throw err;
     }
 }
 
@@ -228,8 +230,11 @@ export async function getPaymentId(player: IPlayer, sheetName: string): Promise<
         }
         throw new Error(`Player not found in the sheet`);
     } catch (err: Error | any) {
-        console.error(`The API returned an error: ${err.message}`);
-        throw new Error(`The API returned an error: ${err.message}`);
+        console.error(`Error in getPaymentId: ${err.message}`);
+        if (err.message === "Player not found in the sheet") {
+            throw err;
+        }
+        throw new Error(`Failed to retrieve payment ID: ${err.message}`);
     }
 }
 
@@ -262,11 +267,25 @@ export async function createSundaySheetIfMissing(): Promise<string> {
     } else {
         console.log(`adding a new sheet called ${thisSunday}`);
         await addSheets(thisSunday);
-        // Add the title of the columns
         await appendRowToSheet(["First Name", "Last Name", "Email", "Phone Number", "Pay ID", "Paid?"], thisSunday);
         const sheetId = await getSheetId(thisSunday);
         await makeRowBold(sheetId, 0);
         return thisSunday;
+    }
+}
+
+export async function createSheetForDate(dateString: string): Promise<string> {
+    try {
+        await getSheetId(dateString);
+        console.log(`Sheet "${dateString}" already exists`);
+        return dateString;
+    } catch {
+        console.log(`Creating new sheet for date: ${dateString}`);
+        await addSheets(dateString);
+        await appendRowToSheet(["First Name", "Last Name", "Email", "Phone Number", "Pay ID", "Paid?"], dateString);
+        const sheetId = await getSheetId(dateString);
+        await makeRowBold(sheetId, 0);
+        return dateString;
     }
 }
 
@@ -312,7 +331,9 @@ export async function getSheetId(sheetName: string) {
 
         return String(sheet?.properties?.sheetId);
     } catch (error: Error | any) {
-        console.error(error);
+        if (!error.message?.includes("not found")) {
+            console.error(error);
+        }
         throw error;
     }
 }

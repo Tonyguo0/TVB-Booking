@@ -1,47 +1,70 @@
-import axios, { AxiosResponse } from "axios";
+import axios from "axios";
 import { IPlayer } from "../model/player";
-const baseUrl = "http://localhost:3000/api";
 
-const createPay = async (newPlayer: IPlayer, token: string, voucher: string) => {
+const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+
+const createPay = async (newPlayer: IPlayer, token: string, voucher: string, date?: string) => {
     try {
         const body = {
             sourceId: token,
             player: newPlayer,
-            voucher: voucher
+            voucher: voucher,
+            date: date
         };
-        console.log(JSON.stringify(body, null, 6));
         const response = await axios.post(`${baseUrl}/createPay`, body);
-        // console.log(JSON.stringify(response.data, null, 6));
-        console.log(response.data);
         return response.data;
     } catch (err) {
-        console.log(err);
+        console.error(err);
     }
 };
 
-const createPayLink = async (newPlayer: IPlayer) => {
+const refundPayment = async (playerToRefund: IPlayer, date?: string) => {
     try {
-        const body: { player: IPlayer } = {
-            player: newPlayer
-        };
-        const response = await axios.post(`${baseUrl}/createPayLink`, body);
+        const body = { player: playerToRefund, date: date };
+        const response = await axios.post(`${baseUrl}/refundPayment`, body);
         return response.data;
     } catch (err) {
-        console.log(err);
+        console.error(err);
     }
 };
 
-// TODO: WIP
-const refundPayment = async (playerToRefund: IPlayer) => {
+const validateVoucher = async (player: IPlayer, voucher: string, date?: string) => {
     try {
-        const body: { player: IPlayer } = { player: playerToRefund };
-        console.log(body);
-        const response: AxiosResponse = await axios.post(`${baseUrl}/refundPayment`, body);
-        
+        const body = { player, voucher, date };
+        const response = await axios.post(`${baseUrl}/validateVoucher`, body);
         return response.data;
     } catch (err) {
-        console.log(err);
+        console.error(err);
+        return { valid: false, amount: "15.00" };
     }
 };
 
-export default { createPay, createPayLink, refundPayment };
+const registerWithVoucher = async (player: IPlayer, voucher: string, date?: string) => {
+    try {
+        const body = { player, voucher, date };
+        const response = await axios.post(`${baseUrl}/registerWithVoucher`, body);
+        return response.data;
+    } catch (err) {
+        console.error(err);
+    }
+};
+
+export interface SpotsData {
+    total: number;
+    taken: number;
+    remaining: number;
+}
+
+const getSpots = async (date: string): Promise<SpotsData> => {
+    try {
+        const response = await axios.get(`${baseUrl}/spots`, {
+            params: { date }
+        });
+        return response.data;
+    } catch (err) {
+        console.error(err);
+        return { total: 0, taken: 0, remaining: 0 };
+    }
+};
+
+export default { createPay, refundPayment, validateVoucher, registerWithVoucher, getSpots };

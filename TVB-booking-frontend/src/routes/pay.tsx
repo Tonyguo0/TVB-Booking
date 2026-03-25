@@ -1,148 +1,215 @@
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-// https://www.npmjs.com/package/react-square-web-payments-sdk-fixed
-import { Afterpay, CreditCard, Divider, GooglePay, PaymentForm } from "react-square-web-payments-sdk-fixed";
-// import { Afterpay, BuyerType, CreditCard, Divider, GooglePay, PaymentForm } from "react-square-web-payments-sdk";
-
-import { TokenResult, VerifyBuyerResponseDetails } from "@square/web-sdk";
-import { useEffect, useState } from "react";
-import { IPlayer, emptyPlayer } from "../model/player";
-import payService from "../services/pay";
-
-
+import { notifications } from "@mantine/notifications";
+import { Button, Card, LoadingOverlay, Title, Text, Stack } from "@mantine/core";
+import { ArrowLeft } from "lucide-react";
+import { TokenResult } from "@square/web-sdk";
+import {
+    Afterpay,
+    CreditCard,
+    GooglePay,
+    PaymentForm
+} from "react-square-web-payments-sdk-fixed";
+import OrderSummary from "@/components/OrderSummary";
+import PaymentMethodSelector, {
+    type PaymentMethod
+} from "@/components/PaymentMethodSelector";
+import PageLayout from "@/components/layout/PageLayout";
+import { IPlayer } from "@/model/player";
+import payService from "@/services/pay";
+import { formatDateForBackend } from "@/utils/dates";
 
 const Pay = () => {
     const { state } = useLocation();
-    let player: IPlayer = emptyPlayer;
-    const [voucher, setVoucher] = useState("");
-    const [amount, setAmount] = useState("15.00");
-    useEffect(() => {
-        if (voucher == `FIRSTTIMETVB`) {
-            setAmount("0.00");
-        } else{
-            setAmount("15.00");
-        }
-    }, [voucher]);
+    const navigate = useNavigate();
+    const [paymentMethod, setPaymentMethod] =
+        useState<PaymentMethod>("credit-card");
+    const [mountedMethods, setMountedMethods] = useState<Set<PaymentMethod>>(
+        () => new Set(["credit-card"])
+    );
+    const [isConfirming, setIsConfirming] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
 
-    const handleChangeVoucher = async (event: React.FormEvent<HTMLInputElement>) => {
-        event.preventDefault();
-        console.log("voucher change", event.currentTarget.value);
-        const value = event.currentTarget.value;
-        console.log(value);
-        setVoucher(value);
-       
-        console.log(amount)
+    const handlePaymentMethodChange = (method: PaymentMethod) => {
+        setPaymentMethod(method);
+        setMountedMethods((prev) => {
+            if (prev.has(method)) return prev;
+            return new Set([...prev, method]);
+        });
     };
 
-    const handleCreatePaymentRequest= () => {
-        console.log(`amount in ${amount}`);
-        return {
-            countryCode: "AU",
-            currencyCode: "AUD",
-            total: {
-                // TODO: figure out how to dynamically set this amount
-                amount: amount,
-                label: "Total"
-            },
-            discounts: [
-                {
-                    amount:  "0.00",
-                    label: "First Time TVB"
-                }
-            ]
-        };
+    if (!state || !state.player || !state.selectedDate) {
+        notifications.show({
+            color: "red",
+            title: "Missing booking details",
+            message: "Please fill in your details and select a date before proceeding to payment."
+        });
+        navigate(`/`);
+        return null;
     }
 
-    const SQUARE_APPLICATION_ID: string = import.meta.env.VITE_SB_SQ_APPLICATION_ID;
-    const SQUARE_LOCATION_ID: string = import.meta.env.VITE_SB_SQ_LOCATION_ID;
-    const navigate = useNavigate();
-    if (state.player != null) {
-        player = state.player;
-        console.log(player);
-    }
+    const player: IPlayer = state.player;
+    const amount: string = state.amount ?? "15.00";
+    const voucher: string = state.voucher ?? "";
+    const selectedDate = new Date(state.selectedDate);
+    const dateStr = formatDateForBackend(selectedDate);
+    const isVoucherBooking = amount === "0.00";
+    const SQUARE_APPLICATION_ID: string =
+        import.meta.env.VITE_SB_SQ_APPLICATION_ID;
+    const SQUARE_LOCATION_ID: string =
+        import.meta.env.VITE_SB_SQ_LOCATION_ID;
+
+    console.log("Payment page - amount:", amount, "date:", dateStr, "voucher:", voucher);
+
+    const handleCreatePaymentRequest = () => ({
+        countryCode: "AU",
+        currencyCode: "AUD",
+        total: {
+            amount: amount,
+            label: "Total"
+        }
+    });
+
+    const handleTokenResult = async (token: TokenResult) => {
+        if (!token.token) {
+            notifications.show({ color: "red", title: "Error", message: "Card tokenization failed. Please try again." });
+            return;
+        }
+        setIsProcessing(true);
+        try {
+            const response = await payService.createPay(
+                player,
+                token.token,
+                voucher,
+                dateStr
+            );
+            if (!response || response.status === "failed") {
+                notifications.show({ color: "red", title: "Payment failed", message: response?.message ?? "Payment unsuccessful" });
+            } else if (response.status === "already_registered") {
+                notifications.show({ color: "red", title: "Already registered", message: "Player has already registered for TVB this week!" });
+            } else if (response.status === "waiting_list") {
+                notifications.show({ color: "blue", title: "Waiting list", message: "Player added to the waiting list!" });
+            } else if (response.status === "voucher_applied") {
+                notifications.show({ color: "green", title: "Success", message: "Voucher applied! No payment required." });
+            } else if (response.status === "paid") {
+                notifications.show({ color: "green", title: "Payment successful", message: "Your payment has been processed." });
+            }
+            navigate(`/`);
+        } catch (err) {
+            console.error(err);
+            notifications.show({ color: "red", title: "Error", message: "Payment unsuccessful" });
+            navigate(`/`);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleConfirmVoucherBooking = async () => {
+        setIsConfirming(true);
+        try {
+            const response = await payService.registerWithVoucher(
+                player,
+                voucher,
+                dateStr
+            );
+            console.log("Register with voucher response:", response);
+
+            if (!response || response.status === "failed") {
+                notifications.show({ color: "red", title: "Error", message: response?.message ?? "Registration failed" });
+            } else if (response.status === "already_registered") {
+                notifications.show({ color: "red", title: "Already registered", message: "Player has already registered for this week!" });
+            } else if (response.status === "voucher_applied") {
+                notifications.show({ color: "green", title: "Success", message: "Voucher applied! You are registered — no payment required." });
+            } else if (response.status === "waiting_list") {
+                notifications.show({ color: "blue", title: "Waiting list", message: "Player added to the waiting list!" });
+            }
+            navigate(`/`);
+        } catch (err) {
+            console.error(err);
+            notifications.show({ color: "red", title: "Error", message: "An error occurred. Please try again." });
+        } finally {
+            setIsConfirming(false);
+        }
+    };
+
     return (
-        <>
-            <PaymentForm
-                /**
-                 * Identifies the calling form with a verified application ID generated from
-                 * the Square Application Dashboard.
-                 */
-                applicationId={SQUARE_APPLICATION_ID}
-                locationId={SQUARE_LOCATION_ID}
-                /**
-                 * Invoked when payment form receives the result of a tokenize generation
-                 * request. The result will be a valid credit card or wallet token, or an error.
-                 */
+        <PageLayout>
+            <Stack gap="lg">
+                <Button
+                    variant="subtle"
+                    onClick={() => navigate(`/`)}
+                    leftSection={<ArrowLeft size={16} />}
+                    style={{ alignSelf: "flex-start" }}
+                    disabled={isProcessing || isConfirming}
+                >
+                    Back
+                </Button>
 
-                cardTokenizeResponseReceived={async (token: TokenResult, buyer: VerifyBuyerResponseDetails | null | undefined) => {
-                    console.info({ token, buyer });
-                    try {
-                        const response = await payService.createPay(player, token.token!, voucher);
-                        console.log(response);
-                        switch (response) {
-                            case 0:
-                                alert(`payment wasn't required with the discount you're not on the list!`);
-                                navigate(`/`);
-                                break;
-                            case true:
-                                alert(`player is on the waiting list!`);
-                                navigate(`/`);
-                                break;
-                            case false:
-                                alert(`player has already registered in TVB!`);
-                                navigate(`/`);
-                                break;
-                            case undefined:
-                                alert(`payment unsuccessful`);
-                                navigate(`/`);
-                                break;
-                            default:
-                                if (response.result.payment.status === `COMPLETED`) {
-                                    alert(`payment successful`);
-                                    navigate(`/`);
-                                    break;
+                <OrderSummary
+                    player={player}
+                    selectedDate={selectedDate}
+                    amount={amount}
+                />
+
+                {isVoucherBooking ? (
+                    <Card withBorder shadow="sm" radius="md" padding="lg">
+                        <Title order={4} mb="md">Confirm Booking</Title>
+                        <Stack>
+                            <Text size="sm" c="dimmed">
+                                Your voucher covers the full amount. No payment
+                                is required — just confirm your booking below.
+                            </Text>
+                            <Button
+                                fullWidth
+                                onClick={handleConfirmVoucherBooking}
+                                loading={isConfirming}
+                            >
+                                Confirm Booking
+                            </Button>
+                        </Stack>
+                    </Card>
+                ) : (
+                    <>
+                        <Card withBorder shadow="sm" radius="md" padding="lg">
+                            <Title order={4} mb="md">Payment Method</Title>
+                            <PaymentMethodSelector
+                                selected={paymentMethod}
+                                onSelect={handlePaymentMethodChange}
+                            />
+                        </Card>
+
+                        <Card withBorder shadow="sm" radius="md" padding="lg" pos="relative">
+                            <LoadingOverlay visible={isProcessing} zIndex={1000} overlayProps={{ radius: "sm", blur: 2 }} />
+                            <PaymentForm
+                                applicationId={SQUARE_APPLICATION_ID}
+                                locationId={SQUARE_LOCATION_ID}
+                                cardTokenizeResponseReceived={
+                                    handleTokenResult
                                 }
-                        }
-                    } catch (err) {
-                        console.error(err);
-                        alert(`payment unsuccessful`);
-                    }
-                }}
-                createPaymentRequest={handleCreatePaymentRequest}
-                /**
-                 * This function enable the Strong Customer Authentication (SCA) flow
-                 *
-                 * We strongly recommend use this function to verify the buyer and reduce
-                 * the chance of fraudulent transactions.
-                 */
-                // createVerificationDetails={() => ({
-                //     amount: "1.00",
-                //     /* collected from the buyer */
-                //     billingContact: {
-                //         addressLines: ["123 Main Street", "Apartment 1"],
-                //         familyName: "Doe",
-                //         givenName: "John",
-                //         countryCode: "GB",
-                //         city: "London"
-                //     },
-                //     currencyCode: "GBP",
-                //     intent: "CHARGE"
-                // })}
-                /**
-                 * Identifies the location of the merchant that is taking the payment.
-                 * Obtained from the Square Application Dashboard - Locations tab.
-                 */
-            >
-                {/* figure out how to show the payment amount */}
-                <CreditCard includeInputLabels postalCode="12345" />
-
-                <Divider />
-                <GooglePay />
-                <Divider />
-                <Afterpay />
-                <label htmlFor="voucher">Voucher:</label>
-                <input id="voucher" type="text" value={voucher} onChange={handleChangeVoucher} />
-            </PaymentForm>
-        </>
+                                createPaymentRequest={
+                                    handleCreatePaymentRequest
+                                }
+                            >
+                                <div style={{ display: paymentMethod === "credit-card" ? "block" : "none" }}>
+                                    {/* @ts-expect-error - empty string disables auto-focus to prevent PaymentMethodNotAttachedError */}
+                                    <CreditCard includeInputLabels focus="" />
+                                </div>
+                                {mountedMethods.has("google-pay") && (
+                                    <div style={{ display: paymentMethod === "google-pay" ? "block" : "none" }}>
+                                        <GooglePay />
+                                    </div>
+                                )}
+                                {mountedMethods.has("afterpay") && (
+                                    <div style={{ display: paymentMethod === "afterpay" ? "block" : "none" }}>
+                                        <Afterpay />
+                                    </div>
+                                )}
+                            </PaymentForm>
+                        </Card>
+                    </>
+                )}
+            </Stack>
+        </PageLayout>
     );
 };
 
