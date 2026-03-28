@@ -10,13 +10,13 @@ import { notifyPlayerPromotion } from "./services/notification";
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
     interface BigInt {
-        /** Convert to BigInt to string form in JSON.stringify */
-        toJSON: () => string;
+        /** Convert to BigInt to number form in JSON.stringify */
+        toJSON: () => number;
     }
 }
 
 BigInt.prototype.toJSON = function () {
-    return this.toString();
+    return Number(this);
 };
 
 const squareClient: SquareClient = new SquareClient({
@@ -75,7 +75,7 @@ export async function addNonDuplicateCustomer(player: IPlayer): Promise<string> 
 }
 
 export const checkIfCustomerExists = async (player: IPlayer): Promise<boolean> => {
-    try{
+    try {
         const response: SearchCustomersResponse = await squareClient.customers.search({
             query: {
                 filter: {
@@ -86,7 +86,7 @@ export const checkIfCustomerExists = async (player: IPlayer): Promise<boolean> =
             }
         });
         let duplicateCustomer: boolean = false;
-        if(response?.customers == null) {
+        if (response?.customers == null) {
             return duplicateCustomer;
         }
         response.customers?.forEach((customer) => {
@@ -125,12 +125,7 @@ const deleteOrReplacePlayer = async (player: IPlayer, sheetName: string, sheetId
 
                 // notify the promoted player
                 if (promotedPlayer) {
-                    notifyPlayerPromotion(
-                        promotedPlayer.email,
-                        promotedPlayer.phone_no,
-                        promotedPlayer.first_name,
-                        promotedPlayer.notification_preference
-                    ).catch((err) => console.error(`Failed to notify promoted player:`, err));
+                    notifyPlayerPromotion(promotedPlayer.email, promotedPlayer.phone_no, promotedPlayer.first_name, promotedPlayer.notification_preference).catch((err) => console.error(`Failed to notify promoted player:`, err));
                 }
             }
             if (sheetRowNum === MAX_PLAYERS + 4) {
@@ -236,6 +231,8 @@ payController.post(
             return { status: `failed`, message: `Registration already in progress for this player` };
         }
         registrationLocks.add(playerKey);
+        let customerExists: boolean = false;
+        let CustomerId: string = ``;
         try {
             console.log(`Create body payment = `);
             console.log(`Voucher received: ${body.voucher}`);
@@ -250,10 +247,10 @@ payController.post(
             }
 
             // Check if customer exists BEFORE creating them (for voucher eligibility)
-            const customerExists: boolean = await checkIfCustomerExists(body.player);
+            customerExists = await checkIfCustomerExists(body.player);
             console.log(`customerExists (before creation): ${customerExists}`);
 
-            const CustomerId: string = await addNonDuplicateCustomer(body.player);
+            CustomerId = await addNonDuplicateCustomer(body.player);
             if (CustomerId === ``) {
                 throw new Error(`Customer not created or something went wrong with getting customerID: ${CustomerId}`);
             }
@@ -264,6 +261,17 @@ payController.post(
             return response;
         } catch (err) {
             console.log(err);
+            // Roll back customer creation so voucher stays usable on retry
+            // Only roll back if we created the customer in this request 
+            // (i.e. customer did not exist before) to avoid deleting an existing customer
+            if (!customerExists && CustomerId) {
+                try {
+                    await squareClient.customers.delete({ customerId: CustomerId });
+                    console.log(`Rolled back customer creation for failed payment: ${CustomerId}`);
+                } catch (deleteErr) {
+                    console.error(`Failed to roll back customer:`, deleteErr);
+                }
+            }
             return { status: `failed`, message: `Payment processing failed` };
         } finally {
             registrationLocks.delete(playerKey);
@@ -404,12 +412,7 @@ payController.post(
             }
 
             // Pass customerExistsOverride as false since we validated BEFORE creating the customer
-            const response: PayResponse = await checkAndAddRowToSheet(
-                { sourceId: ``, player: body.player, voucher: body.voucher, notification_preference: body.notification_preference },
-                CustomerId,
-                sheetName,
-                false
-            );
+            const response: PayResponse = await checkAndAddRowToSheet({ sourceId: ``, player: body.player, voucher: body.voucher, notification_preference: body.notification_preference }, CustomerId, sheetName, false);
 
             set.status = 201;
             set.headers[`Content-Type`] = `application/json`;
