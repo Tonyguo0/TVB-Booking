@@ -4,8 +4,9 @@ import Elysia, { t } from "elysia";
 import { SquareClient, SquareEnvironment, CreatePaymentResponse, CreateCustomerResponse, CreateOrderResponse, Order, OrderLineItemDiscount, RefundPaymentResponse, SearchCustomersResponse } from "square";
 import { PayResponse, RefundResponse, SpotsResponse } from "./model/apiResponse";
 import { IPlayer } from "./model/player";
-import { checkAndAddRowToSheet, createSheetForDate, createSundaySheetIfMissing, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer } from "./sheet";
+import { checkAndAddRowToSheet, createSheetForDate, createSheetIfMissing, copyAndReplaceRow, deleteRowBasedOnIndex, deleteRowBasedOnPlayer, findRowIndexBasedOnPlayer, getNumberOfRows, getPaymentId, getRow, getSheetId, sheetContainsPlayer, type PromotedPlayerInfo } from "./sheet";
 import { ITEM_VARIATION_ID, LOCATION_ID, MAX_PLAYERS, VOUCHER_CODE, WAITING_LIST_PLAYER_AMOUNT, PRICE_AMOUNT_CENTS, PRICE_AMOUNT_DISPLAY, CURRENCY_CODE, CRON_SCHEDULE, TIMEZONE } from "./utils/utils";
+import { notifyPlayerPromotion } from "./services/notification";
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 declare global {
     interface BigInt {
@@ -25,8 +26,14 @@ const squareClient: SquareClient = new SquareClient({
 
 export const payController = new Elysia();
 
+const registrationLocks: Set<string> = new Set();
+
+function getPlayerKey(player: IPlayer): string {
+    return `${player.first_name.trim().toLowerCase()}|${player.last_name.trim().toLowerCase()}|${player.email.trim().toLowerCase()}|${player.phone_no.trim()}`;
+}
+
 async function resolveSheetName(date?: string): Promise<string> {
-    return date ? await createSheetForDate(date) : await createSundaySheetIfMissing();
+    return date ? await createSheetForDate(date) : await createSheetIfMissing();
 }
 
 /**
@@ -100,31 +107,34 @@ const deleteOrReplacePlayer = async (player: IPlayer, sheetName: string, sheetId
         const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
         const playerIndex: number = await findRowIndexBasedOnPlayer(player, rows);
         console.log(`playerIndex = ${playerIndex}`);
-        // TODO: need to test this
-        // TODO: might need to take the outer if, since we want to check if there is a waiting list first or not
 
         const sheetRowNum: number = await getNumberOfRows(sheetName);
         // row of where waiting list title starts
         if (sheetRowNum <= MAX_PLAYERS + 3) {
-            // if number of players doesn't exceed max player limit, delete the player from the sheet
-            // aka: no waiting list
+            // no waiting list — just delete the player
             await deleteRowBasedOnPlayer(player, sheetName, sheetId);
         } else {
-            // aka: there is a waiting list
+            // there is a waiting list
             if (playerIndex > MAX_PLAYERS + 1) {
-                // if refunded player is in the waiting list, delete the player from the waiting list
+                // refunded player is in the waiting list — just delete them
                 await deleteRowBasedOnPlayer(player, sheetName, sheetId);
             } else {
-                // if number of player does exceed max player limit, replace the player with the next player in the waiting list
-                // copyAndReplaceRow() : replace the row which the player was refunded from with the next player in the waiting list
-                // deleteRow(): delete the row of the player who was refunded
-
-                await copyAndReplaceRow(player, sheetName);
+                // replace the refunded player with the first waiting list player
+                const promotedPlayer: PromotedPlayerInfo | null = await copyAndReplaceRow(player, sheetName);
                 await deleteRowBasedOnIndex(MAX_PLAYERS + 4, sheetName, sheetId);
+
+                // notify the promoted player
+                if (promotedPlayer) {
+                    notifyPlayerPromotion(
+                        promotedPlayer.email,
+                        promotedPlayer.phone_no,
+                        promotedPlayer.first_name,
+                        promotedPlayer.notification_preference
+                    ).catch((err) => console.error(`Failed to notify promoted player:`, err));
+                }
             }
             if (sheetRowNum === MAX_PLAYERS + 4) {
-                // if the number of players is equal to the max player limit, delete waiting list title and the replacement row
-                // has to be deleted in this order as the rows shift up when a row is deleted
+                // clean up waiting list structure rows
                 await deleteRowBasedOnIndex(MAX_PLAYERS + 3, sheetName, sheetId);
                 await deleteRowBasedOnIndex(MAX_PLAYERS + 2, sheetName, sheetId);
             }
@@ -221,6 +231,11 @@ async function createOrder(CustomerId: string, voucher: string, customerExists: 
 payController.post(
     `/createPay`,
     async ({ body, set }): Promise<PayResponse> => {
+        const playerKey: string = getPlayerKey(body.player);
+        if (registrationLocks.has(playerKey)) {
+            return { status: `failed`, message: `Registration already in progress for this player` };
+        }
+        registrationLocks.add(playerKey);
         try {
             console.log(`Create body payment = `);
             console.log(`Voucher received: ${body.voucher}`);
@@ -250,6 +265,8 @@ payController.post(
         } catch (err) {
             console.log(err);
             return { status: `failed`, message: `Payment processing failed` };
+        } finally {
+            registrationLocks.delete(playerKey);
         }
     },
     {
@@ -262,7 +279,8 @@ payController.post(
                 phone_no: t.String()
             }),
             voucher: t.String(),
-            date: t.Optional(t.String())
+            date: t.Optional(t.String()),
+            notification_preference: t.Optional(t.Union([t.Literal(`email`), t.Literal(`sms`), t.Literal(`both`)]))
         })
     }
 );
@@ -323,7 +341,8 @@ payController.post(
 const playerBodySchema = t.Object({
     player: t.Object({ first_name: t.String(), last_name: t.String(), email: t.String(), phone_no: t.String() }),
     voucher: t.String(),
-    date: t.Optional(t.String())
+    date: t.Optional(t.String()),
+    notification_preference: t.Optional(t.Union([t.Literal(`email`), t.Literal(`sms`), t.Literal(`both`)]))
 });
 
 payController.post(
@@ -358,6 +377,11 @@ payController.post(
 payController.post(
     `/registerWithVoucher`,
     async ({ body, set }): Promise<PayResponse> => {
+        const playerKey: string = getPlayerKey(body.player);
+        if (registrationLocks.has(playerKey)) {
+            return { status: `failed`, message: `Registration already in progress for this player` };
+        }
+        registrationLocks.add(playerKey);
         try {
             console.log(`Registering player with voucher: "${body.voucher}"`);
             const sheetName: string = await resolveSheetName(body.date);
@@ -381,7 +405,7 @@ payController.post(
 
             // Pass customerExistsOverride as false since we validated BEFORE creating the customer
             const response: PayResponse = await checkAndAddRowToSheet(
-                { sourceId: ``, player: body.player, voucher: body.voucher },
+                { sourceId: ``, player: body.player, voucher: body.voucher, notification_preference: body.notification_preference },
                 CustomerId,
                 sheetName,
                 false
@@ -393,6 +417,8 @@ payController.post(
         } catch (err) {
             console.log(err);
             return { status: `failed`, message: `Registration failed` };
+        } finally {
+            registrationLocks.delete(playerKey);
         }
     },
     { body: playerBodySchema }
@@ -430,6 +456,25 @@ payController.get(
     }
 );
 
+payController.post(
+    `/checkRegistration`,
+    async ({ body }): Promise<{ registered: boolean }> => {
+        try {
+            const sheetName: string = await resolveSheetName(body.date);
+            const registered: boolean = await sheetContainsPlayer(body.player, sheetName);
+            return { registered };
+        } catch {
+            return { registered: false };
+        }
+    },
+    {
+        body: t.Object({
+            player: t.Object({ first_name: t.String(), last_name: t.String(), email: t.String(), phone_no: t.String() }),
+            date: t.Optional(t.String())
+        })
+    }
+);
+
 // Schedule a task to run at a specific date and time
 // The cron syntax is 'second minute hour day month dayOfWeek'
 // This will run at 00:00:00 on December 31
@@ -438,7 +483,7 @@ new CronJob(
     CRON_SCHEDULE,
     async () => {
         try {
-            const sheetName: string = await createSundaySheetIfMissing();
+            const sheetName: string = await createSheetIfMissing();
             console.log(`sheetName = ${sheetName}`);
 
             const sheetId: string = await getSheetId(sheetName);

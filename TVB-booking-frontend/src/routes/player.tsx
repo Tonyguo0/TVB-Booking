@@ -5,13 +5,14 @@ import { Alert, Button, Card, Progress, TextInput, Title, Text, Divider, Stack }
 import DatePicker from "@/components/DatePicker";
 import PlayerForm from "@/components/PlayerForm";
 import PageLayout from "@/components/layout/PageLayout";
-import { emptyPlayer } from "@/model/player";
+import { emptyPlayer, type NotificationPreference } from "@/model/player";
 import payService, { type SpotsData, type VoucherValidationResponse, type RefundResponse } from "@/services/pay";
 import { formatDateForBackend } from "@/utils/dates";
 
 const Player = () => {
     const [player, setPlayer] = useState(emptyPlayer);
     const [voucher, setVoucher] = useState(``);
+    const [notificationPreference, setNotificationPreference] = useState<NotificationPreference | undefined>(undefined);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isRefundLoading, setIsRefundLoading] = useState<boolean>(false);
@@ -83,6 +84,12 @@ const Player = () => {
         const dateStr: string = formatDateForBackend(selectedDate);
 
         try {
+            const alreadyRegistered: boolean = await payService.checkRegistration(player, dateStr);
+            if (alreadyRegistered) {
+                notifications.show({ color: `red`, title: `Already registered`, message: `You have already registered for this session.` });
+                return;
+            }
+
             if (voucher.trim() !== ``) {
                 console.log(`Voucher entered:`, voucher);
                 const validation: VoucherValidationResponse = await payService.validateVoucher(
@@ -98,7 +105,8 @@ const Player = () => {
                             player,
                             voucher,
                             amount: `0.00`,
-                            selectedDate: selectedDate.toISOString()
+                            selectedDate: selectedDate.toISOString(),
+                            notificationPreference
                         }
                     });
                 } else {
@@ -112,7 +120,8 @@ const Player = () => {
                             player,
                             voucher: ``,
                             amount: import.meta.env.VITE_PRICE_AMOUNT,
-                            selectedDate: selectedDate.toISOString()
+                            selectedDate: selectedDate.toISOString(),
+                            notificationPreference
                         }
                     });
                 }
@@ -122,7 +131,8 @@ const Player = () => {
                         player,
                         voucher: ``,
                         amount: import.meta.env.VITE_PRICE_AMOUNT,
-                        selectedDate: selectedDate.toISOString()
+                        selectedDate: selectedDate.toISOString(),
+                        notificationPreference
                     }
                 });
             }
@@ -234,6 +244,8 @@ const Player = () => {
                         <PlayerForm
                             player={player}
                             onPlayerChange={handlePlayerChange}
+                            notificationPreference={notificationPreference}
+                            onNotificationPreferenceChange={setNotificationPreference}
                         />
                     </Card>
 

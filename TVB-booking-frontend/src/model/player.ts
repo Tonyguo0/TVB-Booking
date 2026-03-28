@@ -1,3 +1,4 @@
+export type NotificationPreference = "email" | "sms" | "both";
 
 export type IPlayer = {
     first_name: string;

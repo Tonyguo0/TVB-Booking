@@ -1,13 +1,15 @@
-import { TextInput, Stack } from "@mantine/core";
+import { TextInput, Stack, Select } from "@mantine/core";
 import { type ChangeEvent } from "react";
-import { IPlayer } from "@/model/player";
+import { IPlayer, type NotificationPreference } from "@/model/player";
 
 interface PlayerFormProps {
     player: IPlayer;
     onPlayerChange: (event: ChangeEvent<HTMLInputElement>) => void;
+    notificationPreference: NotificationPreference | undefined;
+    onNotificationPreferenceChange: (value: NotificationPreference | undefined) => void;
 }
 
-const PlayerForm = ({ player, onPlayerChange }: PlayerFormProps) => {
+const PlayerForm = ({ player, onPlayerChange, notificationPreference, onNotificationPreferenceChange }: PlayerFormProps) => {
     return (
         <Stack>
             <TextInput
@@ -43,6 +45,19 @@ const PlayerForm = ({ player, onPlayerChange }: PlayerFormProps) => {
                 value={player.phone_no}
                 onChange={onPlayerChange}
                 placeholder="04XX XXX XXX"
+            />
+            <Select
+                label="Waiting list notification preference"
+                description="How should we notify you if a spot opens up?"
+                placeholder="Select preference"
+                data={[
+                    { value: `email`, label: `Email` },
+                    { value: `sms`, label: `SMS` },
+                    { value: `both`, label: `Both Email & SMS` }
+                ]}
+                value={notificationPreference ?? null}
+                onChange={(value) => onNotificationPreferenceChange(value as NotificationPreference | undefined)}
+                clearable
             />
         </Stack>
     );

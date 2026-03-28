@@ -11,6 +11,7 @@ export const CURRENCY_CODE: Currency = getEnv(process.env.CURRENCY_CODE!) as Cur
 export const PORT: number = Number(getEnv(process.env.PORT!));
 export const CRON_SCHEDULE: string = getEnv(process.env.CRON_SCHEDULE!);
 export const TIMEZONE: string = getEnv(process.env.TIMEZONE!);
+export const CORS_ORIGIN: string = getEnv(process.env.CORS_ORIGIN!);
 
 export async function getThisWeekSunday(): Promise<string> {
     const today: Date = new Date();

@@ -1,5 +1,5 @@
 import axios, { AxiosResponse } from "axios";
-import { IPlayer } from "../model/player";
+import { IPlayer, type NotificationPreference } from "../model/player";
 
 export interface PayResponse {
     status: `paid` | `voucher_applied` | `waiting_list` | `already_registered` | `failed`;
@@ -20,13 +20,14 @@ export interface VoucherValidationResponse {
 
 const baseUrl: string = import.meta.env.VITE_API_BASE_URL || `http://localhost:3000/api`;
 
-const createPay = async (newPlayer: IPlayer, token: string, voucher: string, date?: string): Promise<PayResponse | undefined> => {
+const createPay = async (newPlayer: IPlayer, token: string, voucher: string, date?: string, notificationPreference?: NotificationPreference): Promise<PayResponse | undefined> => {
     try {
-        const body: { sourceId: string; player: IPlayer; voucher: string; date?: string } = {
+        const body: { sourceId: string; player: IPlayer; voucher: string; date?: string; notification_preference?: NotificationPreference } = {
             sourceId: token,
             player: newPlayer,
             voucher: voucher,
-            date: date
+            date: date,
+            notification_preference: notificationPreference
         };
         const response: AxiosResponse<PayResponse> = await axios.post(`${baseUrl}/createPay`, body);
         return response.data;
@@ -56,9 +57,9 @@ const validateVoucher = async (player: IPlayer, voucher: string, date?: string):
     }
 };
 
-const registerWithVoucher = async (player: IPlayer, voucher: string, date?: string): Promise<PayResponse | undefined> => {
+const registerWithVoucher = async (player: IPlayer, voucher: string, date?: string, notificationPreference?: NotificationPreference): Promise<PayResponse | undefined> => {
     try {
-        const body: { player: IPlayer; voucher: string; date?: string } = { player, voucher, date };
+        const body: { player: IPlayer; voucher: string; date?: string; notification_preference?: NotificationPreference } = { player, voucher, date, notification_preference: notificationPreference };
         const response: AxiosResponse<PayResponse> = await axios.post(`${baseUrl}/registerWithVoucher`, body);
         return response.data;
     } catch (err) {
@@ -84,4 +85,14 @@ const getSpots = async (date: string): Promise<SpotsData> => {
     }
 };
 
-export default { createPay, refundPayment, validateVoucher, registerWithVoucher, getSpots };
+const checkRegistration = async (player: IPlayer, date?: string): Promise<boolean> => {
+    try {
+        const response: AxiosResponse<{ registered: boolean }> = await axios.post(`${baseUrl}/checkRegistration`, { player, date });
+        return response.data.registered;
+    } catch (err) {
+        console.error(err);
+        return false;
+    }
+};
+
+export default { createPay, refundPayment, validateVoucher, registerWithVoucher, getSpots, checkRegistration };

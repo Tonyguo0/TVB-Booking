@@ -3,7 +3,7 @@ import { GaxiosResponseWithHTTP2 } from "googleapis-common";
 import _ from "lodash";
 import path from "path";
 import { PayResponse } from "./model/apiResponse";
-import { IcreatePaybody } from "./model/createPayBody";
+import { IcreatePaybody, NotificationPreference } from "./model/createPayBody";
 import { IPlayer } from "./model/player";
 import { checkIfCustomerExists, createPayment } from "./pay";
 import { getThisWeekSunday, MAX_PLAYERS } from "./utils/utils";
@@ -108,6 +108,7 @@ async function replaceValueInSheet(range: string, replacementValue: string): Pro
 // TODO: add functionality in refund so that it deletes the row of the player and add another player from the waiting list to replace the old player
 export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: string, sheetName: string, customerExistsOverride?: boolean): Promise<PayResponse> {
     const playerDetailsArray: Array<string> = [body.player.first_name, body.player.last_name, body.player.email, body.player.phone_no];
+    const notifPref: string = body.notification_preference || ``;
     try {
         const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
         if (!rows) throw new Error(`Response rows is empty`);
@@ -129,17 +130,17 @@ export async function checkAndAddRowToSheet(body: IcreatePaybody, customerId: st
             await makeRowBold(sheetId, MAX_PLAYERS + 2);
             await replaceValueInSheet(`${sheetName}!A${MAX_PLAYERS + 2}`, ` `);
             // append the player to the waiting list and check if there is paymentResponse or if the 100% discount is used
-            await appendRowToSheet([...playerDetailsArray, paymentId, `yes`], sheetName);
+            await appendRowToSheet([...playerDetailsArray, paymentId, `yes`, notifPref], sheetName);
         } else if (numOfRows < MAX_PLAYERS + 1) {
             // Append the player for the game and check if there is paymentResponse or if the 100% discount is used
-            await appendRowToSheet([...playerDetailsArray, paymentId, `yes`], sheetName);
+            await appendRowToSheet([...playerDetailsArray, paymentId, `yes`, notifPref], sheetName);
             return {
                 status: isVoucherApplied ? `voucher_applied` : `paid`,
                 paymentId: paymentId || undefined,
                 message: isVoucherApplied ? `Voucher applied, no payment required` : `Payment successful`
             };
         } else {
-            await appendRowToSheet([...playerDetailsArray, paymentId, `yes`], sheetName);
+            await appendRowToSheet([...playerDetailsArray, paymentId, `yes`, notifPref], sheetName);
         }
         return {
             status: `waiting_list`,
@@ -167,24 +168,22 @@ export async function getRow(sheetName: string, rowLetterFrom: string, rowLetter
 }
 
 export async function sheetContainsPlayer(player: IPlayer, sheetName: string): Promise<boolean> {
-    try {
-        const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
-        if (!rows) throw new Error(`Response rows is empty`);
-        const playerArray: Array<string> = [player.first_name, player.last_name, player.email, player.phone_no];
-        for (const row of rows) {
-            console.log(`row:`);
-            console.log(row);
-            console.log(`playerArray:`);
-            console.log(playerArray);
-            if (_.isEqual(row, playerArray)) {
-                return true;
-            }
+    const normalize = (s: string): string => s.trim().toLowerCase();
+    const rows: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
+    if (!rows) throw new Error(`Response rows is empty`);
+    const playerArray: Array<string> = [
+        normalize(player.first_name),
+        normalize(player.last_name),
+        normalize(player.email),
+        normalize(player.phone_no)
+    ];
+    for (const row of rows) {
+        const normalizedRow: Array<string> = row.map(normalize);
+        if (_.isEqual(normalizedRow, playerArray)) {
+            return true;
         }
-        return false;
-    } catch (err: Error | any) {
-        console.error(`The API returned an error: ${err.message}`);
-        return false;
     }
+    return false;
 }
 
 export async function getPaymentId(player: IPlayer, sheetName: string): Promise<string> {
@@ -230,7 +229,7 @@ export async function getSheetTitle(): Promise<string> {
     }
 }
 
-export async function createSundaySheetIfMissing(): Promise<string> {
+export async function createSheetIfMissing(): Promise<string> {
     const latestsheet: string = await getSheetTitle();
     const thisSunday: string = await getThisWeekSunday();
     if (latestsheet === thisSunday) {
@@ -239,7 +238,7 @@ export async function createSundaySheetIfMissing(): Promise<string> {
     } else {
         console.log(`adding a new sheet called ${thisSunday}`);
         await addSheets(thisSunday);
-        await appendRowToSheet([`First Name`, `Last Name`, `Email`, `Phone Number`, `Pay ID`, `Paid?`], thisSunday);
+        await appendRowToSheet([`First Name`, `Last Name`, `Email`, `Phone Number`, `Pay ID`, `Paid?`, `Notif Pref`], thisSunday);
         const sheetId: string = await getSheetId(thisSunday);
         await makeRowBold(sheetId, 0);
         return thisSunday;
@@ -254,7 +253,7 @@ export async function createSheetForDate(dateString: string): Promise<string> {
     } catch {
         console.log(`Creating new sheet for date: ${dateString}`);
         await addSheets(dateString);
-        await appendRowToSheet([`First Name`, `Last Name`, `Email`, `Phone Number`, `Pay ID`, `Paid?`], dateString);
+        await appendRowToSheet([`First Name`, `Last Name`, `Email`, `Phone Number`, `Pay ID`, `Paid?`, `Notif Pref`], dateString);
         const sheetId: string = await getSheetId(dateString);
         await makeRowBold(sheetId, 0);
         return dateString;
@@ -445,11 +444,27 @@ export async function deleteRowBasedOnIndex(rowIndex: number, _sheetName: string
     }
 }
 
-export async function copyAndReplaceRow(player: IPlayer, sheetName: string): Promise<void> {
+export interface PromotedPlayerInfo {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone_no: string;
+    notification_preference?: NotificationPreference;
+}
+
+export async function copyAndReplaceRow(player: IPlayer, sheetName: string): Promise<PromotedPlayerInfo | null> {
     try {
-        // Step 1: Read the row to be copied of the first player in the waiting list
-        const RowToBeReplaced: Array<Array<string>> = await getRow(sheetName, `A${MAX_PLAYERS + 4}`, `F${MAX_PLAYERS + 4}`);
-        if (!RowToBeReplaced) throw new Error(`Row to be replaced is empty in copyAndReplaceRow()`);
+        // Step 1: Read the row to be copied of the first player in the waiting list (A-G includes notif pref)
+        const RowToBeReplaced: Array<Array<string>> = await getRow(sheetName, `A${MAX_PLAYERS + 4}`, `G${MAX_PLAYERS + 4}`);
+        if (!RowToBeReplaced || !RowToBeReplaced[0]) throw new Error(`Row to be replaced is empty in copyAndReplaceRow()`);
+        const promotedRow: Array<string> = RowToBeReplaced[0];
+        const promotedPlayer: PromotedPlayerInfo = {
+            first_name: promotedRow[0] || ``,
+            last_name: promotedRow[1] || ``,
+            email: promotedRow[2] || ``,
+            phone_no: promotedRow[3] || ``,
+            notification_preference: (promotedRow[6] as NotificationPreference) || undefined
+        };
         const playerRow: Array<Array<string>> = await getRow(sheetName, `A`, `D`);
         if (!playerRow) throw new Error(`Player row is empty in copyAndReplaceRow()`);
         const rowIndex: number = await findRowIndexBasedOnPlayer(player, playerRow);
@@ -457,7 +472,7 @@ export async function copyAndReplaceRow(player: IPlayer, sheetName: string): Pro
         const writeRequest = {
             spreadsheetId: process.env.SPREAD_SHEET_ID,
             auth: auth,
-            range: `${sheetName}!A${rowIndex + 1}:F${rowIndex + 1}`, // Adjust the range as needed
+            range: `${sheetName}!A${rowIndex + 1}:G${rowIndex + 1}`,
             valueInputOption: `RAW`,
             resource: {
                 values: RowToBeReplaced
@@ -466,8 +481,10 @@ export async function copyAndReplaceRow(player: IPlayer, sheetName: string): Pro
 
         await sheets.spreadsheets.values.update(writeRequest);
         console.log(`Row copied from row of first player in the waiting list row ${MAX_PLAYERS + 4} to ${rowIndex}`);
+        return promotedPlayer;
     } catch (err: Error | any) {
         console.error(`Failed to copy and replace row: ${err}`);
+        return null;
     }
 }
 

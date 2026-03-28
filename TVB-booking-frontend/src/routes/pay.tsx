@@ -15,7 +15,7 @@ import PaymentMethodSelector, {
     type PaymentMethod
 } from "@/components/PaymentMethodSelector";
 import PageLayout from "@/components/layout/PageLayout";
-import { IPlayer } from "@/model/player";
+import { IPlayer, type NotificationPreference } from "@/model/player";
 import payService, { type PayResponse } from "@/services/pay";
 import { formatDateForBackend } from "@/utils/dates";
 
@@ -53,6 +53,7 @@ const Pay = () => {
     const voucher: string = state.voucher ?? ``;
     const selectedDate: Date = new Date(state.selectedDate);
     const dateStr: string = formatDateForBackend(selectedDate);
+    const notificationPreference: NotificationPreference | undefined = state.notificationPreference;
     const isVoucherBooking: boolean = amount === `0.00`;
     const SQUARE_APPLICATION_ID: string =
         import.meta.env.VITE_SB_SQ_APPLICATION_ID;
@@ -81,7 +82,8 @@ const Pay = () => {
                 player,
                 token.token,
                 voucher,
-                dateStr
+                dateStr,
+                notificationPreference
             );
             if (!response || response.status === `failed`) {
                 notifications.show({ color: `red`, title: `Payment failed`, message: response?.message ?? `Payment unsuccessful` });
@@ -110,7 +112,8 @@ const Pay = () => {
             const response: PayResponse | undefined = await payService.registerWithVoucher(
                 player,
                 voucher,
-                dateStr
+                dateStr,
+                notificationPreference
             );
             console.log(`Register with voucher response:`, response);
 
