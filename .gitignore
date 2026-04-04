@@ -75,3 +75,4 @@ test.ts
 package-lock.json
 
 bun.lockb
+!TVB-booking-backend/bun.lockb
