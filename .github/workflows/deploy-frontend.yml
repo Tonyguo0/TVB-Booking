@@ -1,0 +1,58 @@
+name: Deploy Frontend to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'TVB-booking-frontend/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: TVB-booking-frontend
+        run: bun install
+
+      - name: Build
+        working-directory: TVB-booking-frontend
+        env:
+          VITE_SB_SQ_APPLICATION_ID: ${{ secrets.VITE_SB_SQ_APPLICATION_ID }}
+          VITE_SB_SQ_LOCATION_ID: ${{ secrets.VITE_SB_SQ_LOCATION_ID }}
+          VITE_PRICE_AMOUNT: ${{ vars.VITE_PRICE_AMOUNT }}
+          VITE_CURRENCY_CODE: ${{ vars.VITE_CURRENCY_CODE }}
+          VITE_COUNTRY_CODE: ${{ vars.VITE_COUNTRY_CODE }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: bun run build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: TVB-booking-frontend/dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
